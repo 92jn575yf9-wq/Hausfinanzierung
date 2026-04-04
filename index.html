@@ -821,11 +821,32 @@ const SIM_START = { sv: 85553, ak: 115507 };
 const SIM_RATE  = { sv: 0.0317/12, ak: 0.0141/12 };
 const SIM_PAY   = { sv: 615, ak: 1200 };
 
-// Jahresplan state: year → {sv, ak}
+// Jahresplan state: year → {sv, ak, svMonth, akMonth}
+// month = 1-12 (Jan-Dez), default 12 (Dezember)
 const jahresplan = {};
-for(let y=2026;y<=2035;y++) jahresplan[y] = {sv:0, ak:0};
+for(let y=2026;y<=2035;y++) jahresplan[y] = {sv:0, ak:0, svMonth:12, akMonth:12};
 
-// Einmalige list: [{id, loan, month, amount}]  month=0 means now (Apr 2026)
+// Convert year+month to offset in months from April 2026 (month 0)
+function toOffset(year, month) {
+  return (year - 2026) * 12 + (month - 4); // April 2026 = offset 0
+}
+
+const MONTH_NAMES = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+
+function monthOpts(selected, minOffset=0) {
+  let opts = '';
+  for(let y=2026;y<=2035;y++){
+    for(let m=1;m<=12;m++){
+      const off = toOffset(y, m);
+      if(off < minOffset) continue;
+      const sel = (selected === off) ? 'selected' : '';
+      opts += `<option value="${off}" ${sel}>${MONTH_NAMES[m-1]} ${y}</option>`;
+    }
+  }
+  return opts;
+}
+
+// Einmalige list: [{id, loan, offset, amount}]  offset = months from Apr 2026
 let einmaligList = [];
 let einmaligId = 0;
 let simChart = null;
@@ -836,16 +857,33 @@ function buildJahresplanUI() {
   for(let y=2026;y<=2035;y++){
     const col = document.createElement('div');
     col.style.cssText = 'background:var(--surface2);border-radius:var(--r-md);padding:12px;';
+
+    // Month options starting from Jan of that year (or Apr 2026 for first year)
+    const minOff = y===2026 ? 0 : toOffset(y,1);
+    let svMonthOpts='', akMonthOpts='';
+    for(let m=1;m<=12;m++){
+      const off = toOffset(y,m);
+      if(off < 0) continue;
+      svMonthOpts += `<option value="${m}" ${jahresplan[y].svMonth===m?'selected':''}>${MONTH_NAMES[m-1]}</option>`;
+      akMonthOpts += `<option value="${m}" ${jahresplan[y].akMonth===m?'selected':''}>${MONTH_NAMES[m-1]}</option>`;
+    }
+
     col.innerHTML = `
-      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px">${y}</div>
+      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px">${y}</div>
+
       <div style="font-size:11px;color:var(--text3);margin-bottom:3px">Sparkassenvers.</div>
       <input type="number" id="jp-sv-${y}" value="${jahresplan[y].sv||''}" placeholder="0 €"
-        style="width:100%;font-size:13px;padding:5px 8px;border-radius:8px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text);margin-bottom:6px"
+        style="width:100%;font-size:13px;padding:5px 8px;border-radius:8px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text);margin-bottom:4px"
         oninput="jahresplan[${y}].sv=parseInt(this.value)||0;runSim()">
+      <select style="width:100%;font-size:12px;padding:4px 8px;border-radius:8px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text2);margin-bottom:10px"
+        onchange="jahresplan[${y}].svMonth=parseInt(this.value);runSim()">${svMonthOpts}</select>
+
       <div style="font-size:11px;color:var(--text3);margin-bottom:3px">Anschlusskredit</div>
       <input type="number" id="jp-ak-${y}" value="${jahresplan[y].ak||''}" placeholder="0 €"
-        style="width:100%;font-size:13px;padding:5px 8px;border-radius:8px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)"
+        style="width:100%;font-size:13px;padding:5px 8px;border-radius:8px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text);margin-bottom:4px"
         oninput="jahresplan[${y}].ak=parseInt(this.value)||0;runSim()">
+      <select style="width:100%;font-size:12px;padding:4px 8px;border-radius:8px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text2)"
+        onchange="jahresplan[${y}].akMonth=parseInt(this.value);runSim()">${akMonthOpts}</select>
     `;
     grid.appendChild(col);
   }
@@ -853,7 +891,7 @@ function buildJahresplanUI() {
 
 function addEinmalig() {
   const id = ++einmaligId;
-  einmaligList.push({id, loan:'sv', month:0, amount:5000});
+  einmaligList.push({id, loan:'sv', offset:0, amount:5000});
   renderEinmaligList();
   runSim();
 }
@@ -871,28 +909,24 @@ function renderEinmaligList() {
   }
   einmaligList.forEach(e=>{
     const row = document.createElement('div');
-    row.style.cssText='display:flex;gap:8px;align-items:center;background:var(--surface2);border-radius:var(--r-md);padding:10px 12px;flex-wrap:wrap';
+    row.style.cssText='display:grid;grid-template-columns:1fr 1fr auto auto;gap:8px;align-items:center;background:var(--surface2);border-radius:var(--r-md);padding:10px 12px;';
+    const inpStyle='font-size:12px;padding:5px 8px;border-radius:8px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text);width:100%';
     row.innerHTML=`
-      <select onchange="einmaligList.find(x=>x.id===${e.id}).loan=this.value;runSim()"
-        style="font-size:12px;padding:5px 8px;border-radius:8px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text);flex:1;min-width:130px">
+      <select onchange="einmaligList.find(x=>x.id===${e.id}).loan=this.value;runSim()" style="${inpStyle}">
         <option value="sv" ${e.loan==='sv'?'selected':''}>Sparkassenvers.</option>
         <option value="ak" ${e.loan==='ak'?'selected':''}>Anschlusskredit</option>
       </select>
-      <select onchange="einmaligList.find(x=>x.id===${e.id}).month=parseInt(this.value);runSim()"
-        style="font-size:12px;padding:5px 8px;border-radius:8px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text);flex:1;min-width:110px">
-        <option value="0" ${e.month===0?'selected':''}>Sofort</option>
-        <option value="3" ${e.month===3?'selected':''}>+3 Monate</option>
-        <option value="6" ${e.month===6?'selected':''}>+6 Monate</option>
-        <option value="12" ${e.month===12?'selected':''}>+1 Jahr</option>
-        <option value="24" ${e.month===24?'selected':''}>+2 Jahre</option>
-        <option value="36" ${e.month===36?'selected':''}>+3 Jahre</option>
+      <select onchange="einmaligList.find(x=>x.id===${e.id}).offset=parseInt(this.value);runSim()" style="${inpStyle}">
+        ${monthOpts(e.offset, 0)}
       </select>
-      <input type="number" value="${e.amount}" min="500" step="500"
-        style="font-size:13px;padding:5px 8px;border-radius:8px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text);width:100px"
-        oninput="einmaligList.find(x=>x.id===${e.id}).amount=parseInt(this.value)||0;runSim()">
-      <span style="font-size:12px;color:var(--text3)">€</span>
+      <div style="display:flex;gap:4px;align-items:center">
+        <input type="number" value="${e.amount}" min="500" step="500"
+          style="font-size:13px;padding:5px 8px;border-radius:8px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text);width:90px"
+          oninput="einmaligList.find(x=>x.id===${e.id}).amount=parseInt(this.value)||0;runSim()">
+        <span style="font-size:12px;color:var(--text3)">€</span>
+      </div>
       <button onclick="removeEinmalig(${e.id})"
-        style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;padding:0 4px;line-height:1">✕</button>
+        style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;padding:0 4px;line-height:1;justify-self:end">✕</button>
     `;
     list.appendChild(row);
   });
@@ -917,22 +951,25 @@ function simLoan(loan, extras) {
 
 // Simulate both loans combined with jahresplan + einmalig extras
 function simCombined(inclJahres, inclEinmalig) {
-  // Build month-indexed extras for each loan
   const extSv=[], extAk=[];
 
   if(inclJahres){
-    // Jahresplan: apply in December of each year (month offset from Apr 2026)
     for(let y=2026;y<=2035;y++){
-      const mOffset = (y===2026) ? 8 : (y-2026)*12 + 8; // Dec of each year
-      if(jahresplan[y].sv > 0) extSv.push({month:mOffset, amount:jahresplan[y].sv});
-      if(jahresplan[y].ak > 0) extAk.push({month:mOffset, amount:jahresplan[y].ak});
+      if(jahresplan[y].sv > 0){
+        const off = toOffset(y, jahresplan[y].svMonth);
+        if(off >= 0) extSv.push({month:off, amount:jahresplan[y].sv});
+      }
+      if(jahresplan[y].ak > 0){
+        const off = toOffset(y, jahresplan[y].akMonth);
+        if(off >= 0) extAk.push({month:off, amount:jahresplan[y].ak});
+      }
     }
   }
 
   if(inclEinmalig){
     einmaligList.forEach(e=>{
-      if(e.loan==='sv') extSv.push({month:e.month, amount:e.amount});
-      else extAk.push({month:e.month, amount:e.amount});
+      if(e.loan==='sv') extSv.push({month:e.offset, amount:e.amount});
+      else extAk.push({month:e.offset, amount:e.amount});
     });
   }
 
@@ -940,9 +977,7 @@ function simCombined(inclJahres, inclEinmalig) {
   const akArr = simLoan('ak', extAk);
   const len = Math.max(svArr.length, akArr.length);
   const combined = [];
-  for(let i=0;i<len;i++){
-    combined.push((svArr[i]||0) + (akArr[i]||0));
-  }
+  for(let i=0;i<len;i++) combined.push((svArr[i]||0) + (akArr[i]||0));
   return combined;
 }
 
@@ -1018,17 +1053,19 @@ function runSim() {
       const extSvI=[], extAkI=[];
       // jahresplan + this one einmalig
       for(let y=2026;y<=2035;y++){
-        const mOff=(y===2026)?8:(y-2026)*12+8;
-        if(jahresplan[y].sv>0) extSvI.push({month:mOff,amount:jahresplan[y].sv});
-        if(jahresplan[y].ak>0) extAkI.push({month:mOff,amount:jahresplan[y].ak});
+        if(jahresplan[y].sv>0) extSvI.push({month:toOffset(y,jahresplan[y].svMonth),amount:jahresplan[y].sv});
+        if(jahresplan[y].ak>0) extAkI.push({month:toOffset(y,jahresplan[y].akMonth),amount:jahresplan[y].ak});
       }
-      if(e.loan==='sv') extSvI.push({month:e.month,amount:e.amount});
-      else extAkI.push({month:e.month,amount:e.amount});
+      if(e.loan==='sv') extSvI.push({month:e.offset,amount:e.amount});
+      else extAkI.push({month:e.offset,amount:e.amount});
       const svA=simLoan('sv',extSvI), akA=simLoan('ak',extAkI);
       const comb=[]; for(let i=0;i<Math.max(svA.length,akA.length);i++) comb.push((svA[i]||0)+(akA[i]||0));
 
       const loanName = e.loan==='sv'?'Sparkassenvers.':'Anschlusskredit';
-      const label = `+${e.amount.toLocaleString('de-DE')}€ ${loanName}`;
+      const eDate = new Date(2026, 3 + e.offset, 1);
+      const eMonth = MONTH_NAMES[eDate.getMonth()];
+      const eYear = eDate.getFullYear();
+      const label = `${e.amount.toLocaleString('de-DE')}€ ${loanName} (${eMonth} ${eYear})`;
       datasets.push({label, data:trim(comb), borderColor:col, backgroundColor:'transparent', borderDash:[3,2], tension:0.3, pointRadius:0, borderWidth:1.5});
 
       const li=document.createElement('span'); li.className='leg-item';
