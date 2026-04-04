@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Hausfinanzierung">
+  <title>Hausfinanzierung</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <style>
+    :root {
+      --bg: #f5f5f7;
+      --surface: #ffffff;
+      --surface2: #f0f0f2;
+      --border: rgba(0,0,0,0.1);
+      --border2: rgba(0,0,0,0.18);
+      --text: #1d1d1f;
+      --text2: #6e6e73;
+      --text3: #aeaeb2;
+      --green: #1D9E75;
+      --red: #E24B4A;
+      --blue: #378ADD;
+      --amber: #EF9F27;
+      --purple: #7F77DD;
+      --gray: #888780;
+      --r-md: 10px;
+      --r-lg: 16px;
+      --r-xl: 22px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1c1c1e;
+        --surface: #2c2c2e;
+        --surface2: #3a3a3c;
+        --border: rgba(255,255,255,0.1);
+        --border2: rgba(255,255,255,0.18);
+        --text: #f5f5f7;
+        --text2: #aeaeb2;
+        --text3: #6e6e73;
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* Top bar */
+    .topbar { background: var(--surface); border-bottom: 0.5px solid var(--border); padding: 14px 20px 12px; padding-top: calc(14px + env(safe-area-inset-top)); display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; }
+    .topbar-title { font-size: 17px; font-weight: 600; color: var(--text); letter-spacing: -0.3px; }
+    .topbar-sub { font-size: 12px; color: var(--text2); margin-top: 1px; }
+    .dark-toggle { background: var(--surface2); border: 0.5px solid var(--border); border-radius: 20px; padding: 5px 12px; font-size: 12px; color: var(--text2); cursor: pointer; }
+
+    /* Tab bar */
+    .tabbar { background: var(--surface); border-bottom: 0.5px solid var(--border); padding: 0 16px; display: flex; gap: 0; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+    .tabbar::-webkit-scrollbar { display: none; }
+    .tab { padding: 12px 14px; font-size: 13px; font-weight: 500; color: var(--text2); cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; transition: color 0.15s; }
+    .tab.active { color: var(--green); border-bottom-color: var(--green); }
+
+    /* Content */
+    .content { padding: 16px; max-width: 900px; margin: 0 auto; }
+    .section { display: none; }
+    .section.active { display: block; }
+
+    /* Cards */
+    .card { background: var(--surface); border-radius: var(--r-lg); border: 0.5px solid var(--border); padding: 16px; margin-bottom: 14px; }
+    .card-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 12px; letter-spacing: -0.1px; }
+
+    /* Metrics */
+    .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .metric { background: var(--surface2); border-radius: var(--r-md); padding: 13px 14px; }
+    .metric-label { font-size: 11px; color: var(--text2); margin-bottom: 4px; }
+    .metric-value { font-size: 20px; font-weight: 600; color: var(--text); letter-spacing: -0.5px; }
+    .metric-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
+
+    /* Prognose banner */
+    .prognose-banner { background: linear-gradient(135deg, rgba(239,159,39,0.12), rgba(239,159,39,0.06)); border: 0.5px solid rgba(239,159,39,0.3); border-radius: var(--r-lg); padding: 14px 16px; margin-bottom: 14px; display: flex; flex-wrap: wrap; gap: 16px; }
+    .prognose-item-label { font-size: 11px; color: #BA7517; margin-bottom: 3px; }
+    .prognose-item-value { font-size: 16px; font-weight: 600; color: #854F0B; }
+    @media (prefers-color-scheme: dark) {
+      .prognose-item-label { color: #FAC775; }
+      .prognose-item-value { color: #EF9F27; }
+    }
+
+    /* Progress */
+    .progress-wrap { margin-bottom: 12px; }
+    .progress-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--text2); margin-bottom: 5px; }
+    .progress-bar { height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
+
+    /* Charts */
+    .chart-wrap { position: relative; width: 100%; }
+
+    /* Loan buttons */
+    .controls { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 10px; align-items: center; }
+    .section-label { font-size: 10px; color: var(--text3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-right: 2px; }
+    .divider-v { width: 0.5px; height: 22px; background: var(--border2); margin: 0 3px; }
+
+    .btn { padding: 6px 12px; border-radius: 20px; border: 1.5px solid var(--border2); background: transparent; font-size: 12px; cursor: pointer; color: var(--text2); font-weight: 500; transition: all 0.15s; -webkit-appearance: none; }
+    .btn-rest.on  { background: var(--green);  border-color: var(--green);  color: #fff; }
+    .btn-zins.on  { background: var(--red);    border-color: var(--red);    color: #fff; }
+    .btn-tilg.on  { background: var(--blue);   border-color: var(--blue);   color: #fff; }
+    .btn-prog.on  { background: var(--amber);  border-color: var(--amber);  color: #fff; }
+
+    .loan-btn-wrap { position: relative; display: inline-block; }
+    .loan-btn { padding: 6px 12px; border-radius: 20px; border: 1.5px solid var(--border2); background: transparent; font-size: 12px; cursor: pointer; color: var(--text2); font-weight: 500; display: flex; align-items: center; gap: 5px; transition: all 0.15s; -webkit-appearance: none; }
+    .loan-btn.on { background: var(--surface2); border-color: var(--text2); color: var(--text); }
+    .loan-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .info-icon { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid currentColor; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 600; opacity: 0.5; flex-shrink: 0; }
+
+    /* Popup */
+    .popup { position: absolute; top: calc(100% + 8px); left: 0; z-index: 200; background: var(--surface); border: 0.5px solid var(--border2); border-radius: var(--r-lg); padding: 14px 16px; width: 280px; display: none; box-shadow: 0 8px 32px rgba(0,0,0,0.12); }
+    .popup.open { display: block; }
+    @media (hover: hover) { .loan-btn-wrap:hover .popup.hover-mode { display: block; } }
+    .popup-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 0.5px solid var(--border); }
+    .popup-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    .popup-name { font-size: 13px; font-weight: 600; color: var(--text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .popup-close { background: none; border: none; cursor: pointer; color: var(--text3); font-size: 16px; padding: 2px 4px; display: none; }
+    .popup.open .popup-close { display: block; }
+    .popup-badge { font-size: 10px; padding: 2px 7px; border-radius: 20px; }
+    .badge-active { background: rgba(29,158,117,0.15); color: var(--green); }
+    .badge-done { background: var(--surface2); color: var(--text2); }
+    .popup-row { display: flex; justify-content: space-between; gap: 8px; padding: 4px 0; border-bottom: 0.5px solid var(--border); font-size: 12px; }
+    .popup-row:last-of-type { border-bottom: none; }
+    .popup-key { color: var(--text2); }
+    .popup-val { color: var(--text); font-weight: 500; text-align: right; }
+    .popup-rename { margin-top: 12px; padding-top: 10px; border-top: 0.5px solid var(--border); display: none; }
+    .popup.open .popup-rename { display: block; }
+    .popup-rename-label { font-size: 11px; color: var(--text3); display: block; margin-bottom: 5px; }
+    .rename-row { display: flex; gap: 6px; }
+    .rename-row input { flex: 1; font-size: 12px; padding: 6px 10px; border-radius: 8px; border: 0.5px solid var(--border2); background: var(--surface2); color: var(--text); -webkit-appearance: none; }
+    .rename-row button { padding: 6px 10px; border-radius: 8px; border: 0.5px solid var(--border2); background: transparent; font-size: 11px; cursor: pointer; color: var(--text2); white-space: nowrap; }
+    .popup-saved { font-size: 11px; color: var(--green); margin-top: 5px; opacity: 0; transition: opacity 0.3s; }
+
+    /* Legend */
+    .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; font-size: 11px; color: var(--text2); }
+    .leg-item { display: flex; align-items: center; gap: 4px; }
+    .leg-sq { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
+    .leg-dash { width: 16px; border-top: 2px dashed; flex-shrink: 0; }
+
+    /* Month details */
+    .month-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+    .month-card { background: var(--surface2); border-radius: var(--r-md); padding: 12px; }
+    .month-card-name { font-size: 11px; font-weight: 600; color: var(--text2); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .month-row { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; border-bottom: 0.5px solid var(--border); color: var(--text); }
+    .month-row:last-child { border-bottom: none; font-weight: 600; }
+
+    /* Loan cards */
+    .loan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+    .loan-card { background: var(--surface2); border-radius: var(--r-md); padding: 14px; }
+    .loan-card.dim { opacity: 0.5; }
+    .loan-card-name { font-size: 10px; font-weight: 600; color: var(--text2); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .loan-card-rest { font-size: 20px; font-weight: 600; color: var(--text); letter-spacing: -0.5px; }
+    .loan-card-meta { font-size: 11px; color: var(--text3); margin-top: 3px; }
+    .loan-bar { height: 4px; background: var(--surface); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+    .loan-bar-fill { height: 100%; border-radius: 2px; }
+
+    /* Year table */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; font-size: 12px; border-collapse: collapse; }
+    th { text-align: right; font-weight: 600; font-size: 11px; color: var(--text2); padding: 6px 8px; border-bottom: 0.5px solid var(--border2); }
+    th:first-child { text-align: left; }
+    td { text-align: right; padding: 6px 8px; color: var(--text); border-bottom: 0.5px solid var(--border); }
+    td:first-child { text-align: left; font-weight: 500; }
+    tr:last-child td { border-bottom: none; }
+    tr.current td { background: rgba(29,158,117,0.08); color: var(--green); }
+    tr.forecast td { color: var(--text2); font-style: italic; }
+    tr.total td { font-weight: 600; border-top: 0.5px solid var(--border2); }
+    .tbadge { font-size: 10px; padding: 2px 6px; border-radius: 20px; display: inline-block; margin-left: 4px; }
+    .tbadge-active { background: rgba(29,158,117,0.15); color: var(--green); }
+    .tbadge-done { background: var(--surface2); color: var(--text2); }
+    .tbadge-fc { background: rgba(239,159,39,0.15); color: var(--amber); }
+
+    /* Simulator */
+    .sim-field { display: flex; flex-direction: column; gap: 5px; }
+    .sim-field label { font-size: 12px; color: var(--text2); }
+    .sim-field select { font-size: 13px; padding: 8px 12px; border-radius: 10px; border: 0.5px solid var(--border2); background: var(--surface2); color: var(--text); -webkit-appearance: none; }
+    .sim-field input[type=range] { width: 100%; accent-color: var(--green); }
+    .sim-result { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin: 14px 0; }
+    .sim-metric { background: var(--surface2); border-radius: var(--r-md); padding: 12px 14px; }
+    .sim-metric-label { font-size: 11px; color: var(--text2); margin-bottom: 3px; }
+    .sim-metric-value { font-size: 18px; font-weight: 600; letter-spacing: -0.4px; }
+    .pos { color: var(--green); }
+    .neg { color: var(--red); }
+
+    /* Milestones */
+    .milestone { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--surface2); border-radius: var(--r-md); margin-bottom: 8px; }
+    .milestone-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .milestone-label { flex: 1; font-size: 13px; color: var(--text); }
+    .milestone-when { font-size: 12px; color: var(--text2); white-space: nowrap; }
+
+    /* Hint */
+    .hint { font-size: 11px; color: var(--text3); margin-bottom: 10px; }
+
+    /* History table badges */
+    .hist-badge { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <div class="topbar-title">Hausfinanzierung</div>
+    <div class="topbar-sub">April 2026</div>
+  </div>
+  <button class="dark-toggle" onclick="toggleDark()">Hell / Dunkel</button>
+</div>
+
+<div class="tabbar">
+  <div class="tab active" onclick="showTab('overview',this)">Übersicht</div>
+  <div class="tab" onclick="showTab('month',this)">Monat</div>
+  <div class="tab" onclick="showTab('loans',this)">Darlehen</div>
+  <div class="tab" onclick="showTab('jahres',this)">Jahresabschlüsse</div>
+  <div class="tab" onclick="showTab('prognose',this)">Prognose</div>
+  <div class="tab" onclick="showTab('chart',this)">Chart</div>
+  <div class="tab" onclick="showTab('sim',this)">Simulator</div>
+</div>
+
+<div class="content">
+
+  <!-- ÜBERSICHT -->
+  <div id="tab-overview" class="section active">
+    <div class="prognose-banner">
+      <div><div class="prognose-item-label">Voraussichtliches Ende</div><div class="prognose-item-value">Juli 2035</div></div>
+      <div><div class="prognose-item-label">Restmonate</div><div class="prognose-item-value">~112</div></div>
+      <div><div class="prognose-item-label">Noch zu zahlende Zinsen</div><div class="prognose-item-value">~18.400 €</div></div>
+      <div><div class="prognose-item-label">Geplante Sondertilgungen</div><div class="prognose-item-value">~38.500 €</div></div>
+    </div>
+    <div class="metric-grid">
+      <div class="metric"><div class="metric-label">Gesamtrestschuld</div><div class="metric-value">202.510 €</div><div class="metric-sub">April 2026</div></div>
+      <div class="metric"><div class="metric-label">Getilgt gesamt</div><div class="metric-value">157.490 €</div><div class="metric-sub">von 360.000 €</div></div>
+      <div class="metric"><div class="metric-label">Fortschritt</div><div class="metric-value">43,7 %</div><div class="metric-sub">Tilgungsfortschritt</div></div>
+      <div class="metric"><div class="metric-label">Monatliche Rate</div><div class="metric-value">1.815 €</div><div class="metric-sub">beide Kredite</div></div>
+      <div class="metric"><div class="metric-label">Sondertilgungen</div><div class="metric-value">61.050 €</div><div class="metric-sub">bis heute</div></div>
+      <div class="metric"><div class="metric-label">Laufzeit gesamt</div><div class="metric-value">22 Jahre</div><div class="metric-sub">Sept. 2013 – Juli 2035</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Tilgungsfortschritt</div>
+      <div class="progress-wrap">
+        <div class="progress-label"><span>Sparkassenversicherung</span><span>85.553 € verbleibend</span></div>
+        <div class="progress-bar"><div class="progress-fill" style="width:44%;background:var(--green)"></div></div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-label"><span>Anschlusskredit 1</span><span>115.507 € verbleibend</span></div>
+        <div class="progress-bar"><div class="progress-fill" style="width:24%;background:var(--blue)"></div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Restschuldverlauf + Prognose</div>
+      <div class="legend">
+        <span class="leg-item"><span class="leg-sq" style="background:var(--green)"></span>Ist-Verlauf</span>
+        <span class="leg-item"><span class="leg-dash" style="border-color:var(--blue)"></span>Mit Sondertilgungen</span>
+        <span class="leg-item"><span class="leg-dash" style="border-color:var(--amber)"></span>Ohne Sondertilgungen</span>
+      </div>
+      <div class="chart-wrap" style="height:280px"><canvas id="c-overview1"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Zinsen vs. Tilgung pro Jahr</div>
+      <div class="legend">
+        <span class="leg-item"><span class="leg-sq" style="background:var(--red)"></span>Zinsen (ist)</span>
+        <span class="leg-item"><span class="leg-sq" style="background:var(--green)"></span>Tilgung (ist)</span>
+        <span class="leg-item"><span class="leg-sq" style="background:rgba(228,75,74,0.4)"></span>Zinsen (Prognose)</span>
+        <span class="leg-item"><span class="leg-sq" style="background:rgba(29,158,117,0.4)"></span>Tilgung (Prognose)</span>
+      </div>
+      <div class="chart-wrap" style="height:260px"><canvas id="c-overview2"></canvas></div>
+    </div>
+  </div>
+
+  <!-- MONAT -->
+  <div id="tab-month" class="section">
+    <div class="card">
+      <div class="card-title">April 2026</div>
+      <div class="month-grid">
+        <div class="month-card">
+          <div class="month-card-name">Sparkassenvers.</div>
+          <div class="month-row"><span>Restschuld</span><span>85.553 €</span></div>
+          <div class="month-row"><span>Zinsen</span><span>227,03 €</span></div>
+          <div class="month-row"><span>Tilgung</span><span>387,97 €</span></div>
+          <div class="month-row"><span>Rate</span><span>615,00 €</span></div>
+        </div>
+        <div class="month-card">
+          <div class="month-card-name">Anschlusskredit</div>
+          <div class="month-row"><span>Restschuld</span><span>115.507 €</span></div>
+          <div class="month-row"><span>Zinsen</span><span>135,72 €</span></div>
+          <div class="month-row"><span>Tilgung</span><span>1.064,28 €</span></div>
+          <div class="month-row"><span>Rate</span><span>1.200,00 €</span></div>
+        </div>
+      </div>
+      <div class="metric-grid">
+        <div class="metric"><div class="metric-label">Zinsen gesamt</div><div class="metric-value">362,75 €</div></div>
+        <div class="metric"><div class="metric-label">Tilgung gesamt</div><div class="metric-value">1.452,25 €</div></div>
+        <div class="metric"><div class="metric-label">Rate gesamt</div><div class="metric-value">1.815,00 €</div></div>
+        <div class="metric"><div class="metric-label">Zinsanteil</div><div class="metric-value">20,0 %</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Nächste 12 Monate</div>
+      <div class="chart-wrap" style="height:220px"><canvas id="c-month"></canvas></div>
+    </div>
+  </div>
+
+  <!-- DARLEHEN -->
+  <div id="tab-loans" class="section">
+    <div class="metric-grid">
+      <div class="metric"><div class="metric-label">Aktive Kredite</div><div class="metric-value">2</div><div class="metric-sub">von urspr. 5</div></div>
+      <div class="metric"><div class="metric-label">Abgelöste Kredite</div><div class="metric-value">3</div><div class="metric-sub">Sparkasse, KfW x2</div></div>
+      <div class="metric"><div class="metric-label">Sondertilgungen</div><div class="metric-value">61.050 €</div><div class="metric-sub">bis heute</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Aktive Darlehen</div>
+      <div class="loan-grid">
+        <div class="loan-card">
+          <div class="loan-card-name">Sparkassenversicherung</div>
+          <div class="loan-card-rest">85.553 €</div>
+          <div class="loan-card-meta">3,17 % · 615 €/Monat · Ende ~2032</div>
+          <div class="loan-bar"><div class="loan-bar-fill" style="width:44%;background:var(--green)"></div></div>
+        </div>
+        <div class="loan-card">
+          <div class="loan-card-name">Anschlusskredit 1</div>
+          <div class="loan-card-rest">115.507 €</div>
+          <div class="loan-card-meta">1,41 % · 1.200 €/Monat · Ende 2035</div>
+          <div class="loan-bar"><div class="loan-bar-fill" style="width:24%;background:var(--blue)"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Abgelöste Darlehen</div>
+      <div class="loan-grid">
+        <div class="loan-card dim"><div class="loan-card-name">Sparkasse 600652747</div><div class="loan-card-rest" style="font-size:15px">Abgelöst 2022</div><div class="loan-card-meta">106.000 € · 2,85 %</div><div class="loan-bar"><div class="loan-bar-fill" style="width:100%;background:var(--gray)"></div></div></div>
+        <div class="loan-card dim"><div class="loan-card-name">KfW Wohnraum</div><div class="loan-card-rest" style="font-size:15px">Abgelöst 2022</div><div class="loan-card-meta">50.000 € · 2,40 %</div><div class="loan-bar"><div class="loan-bar-fill" style="width:100%;background:var(--gray)"></div></div></div>
+        <div class="loan-card dim"><div class="loan-card-name">KfW 70 Haus</div><div class="loan-card-rest" style="font-size:15px">Abgelöst 2022</div><div class="loan-card-meta">50.000 € · 1,40 %</div><div class="loan-bar"><div class="loan-bar-fill" style="width:100%;background:var(--gray)"></div></div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Sondertilgungs-Historie</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Jahr</th><th>Monat</th><th>Darlehen</th><th>Betrag</th></tr></thead>
+          <tbody>
+            <tr><td>2015</td><td>Dez</td><td>Sparkasse</td><td>5.300 €</td></tr>
+            <tr><td>2016</td><td>Mai</td><td>Sparkasse</td><td>5.300 €</td></tr>
+            <tr><td>2016</td><td>Dez</td><td>Sparkkassenvers.</td><td>7.350 €</td></tr>
+            <tr><td>2017</td><td>Apr</td><td>Sparkasse</td><td>5.300 €</td></tr>
+            <tr><td>2023</td><td>Dez</td><td>Sparkkassenvers.</td><td>4.000 €</td></tr>
+            <tr><td>2024</td><td>Apr</td><td>Sparkkassenvers.</td><td>7.700 €</td></tr>
+            <tr><td>2025</td><td>Nov</td><td>Sparkkassenvers.</td><td>7.700 €</td></tr>
+            <tr><td>2026</td><td>Okt</td><td>Sparkkassenvers.</td><td>7.700 €</td></tr>
+            <tr><td>2027</td><td>Okt</td><td>Sparkkassenvers.</td><td>7.700 €</td></tr>
+            <tr><td>2028</td><td>Okt</td><td>Sparkkassenvers.</td><td>7.700 €</td></tr>
+            <tr><td>2029</td><td>Okt</td><td>Sparkkassenvers.</td><td>7.700 €</td></tr>
+            <tr class="total"><td colspan="3">Summe</td><td>75.750 €</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- JAHRESABSCHLÜSSE -->
+  <div id="tab-jahres" class="section">
+    <div class="card">
+      <div class="card-title">Jahresabschlüsse – ist + Prognose</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Jahr</th><th>Zinsen</th><th>Tilgung</th><th>Sondertilg.</th><th>Restschuld</th></tr></thead>
+          <tbody id="jahres-body"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Zinslast pro Jahr</div>
+      <div class="legend">
+        <span class="leg-item"><span class="leg-sq" style="background:var(--red)"></span>Zinsen bezahlt</span>
+        <span class="leg-item"><span class="leg-sq" style="background:rgba(228,75,74,0.35)"></span>Prognose</span>
+      </div>
+      <div class="chart-wrap" style="height:260px"><canvas id="c-jahres"></canvas></div>
+    </div>
+  </div>
+
+  <!-- PROGNOSE -->
+  <div id="tab-prognose" class="section">
+    <div class="prognose-banner">
+      <div><div class="prognose-item-label">Schuldenfreiheit</div><div class="prognose-item-value">Juli 2035</div></div>
+      <div><div class="prognose-item-label">Restmonate</div><div class="prognose-item-value">~112</div></div>
+      <div><div class="prognose-item-label">Noch zu zahlen (Raten)</div><div class="prognose-item-value">~203.280 €</div></div>
+      <div><div class="prognose-item-label">Davon Zinsen</div><div class="prognose-item-value">~18.400 €</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Restschuld – mit vs. ohne Sondertilgungen</div>
+      <div class="legend">
+        <span class="leg-item"><span class="leg-sq" style="background:var(--green)"></span>Ist-Verlauf</span>
+        <span class="leg-item"><span class="leg-dash" style="border-color:var(--blue)"></span>Mit Sondertilgungen</span>
+        <span class="leg-item"><span class="leg-dash" style="border-color:var(--amber)"></span>Ohne Sondertilgungen</span>
+      </div>
+      <div class="chart-wrap" style="height:300px"><canvas id="c-prognose"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Prognose-Tabelle</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Jahr</th><th>Mit ST</th><th>Ohne ST</th><th>Ersparnis</th><th>Sondertilg.</th></tr></thead>
+          <tbody id="prognose-body"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Meilensteine</div>
+      <div id="milestones"></div>
+    </div>
+  </div>
+
+  <!-- CHART -->
+  <div id="tab-chart" class="section">
+    <div class="card">
+      <div class="card-title">Interaktiver Verlauf (2013–2035)</div>
+      <div class="controls">
+        <span class="section-label">Anzeigen</span>
+        <button class="btn btn-rest on" id="b-rest" onclick="toggleSeries('rest')">Restschuld</button>
+        <button class="btn btn-zins" id="b-zins" onclick="toggleSeries('zins')">Zinsen</button>
+        <button class="btn btn-tilg" id="b-tilg" onclick="toggleSeries('tilg')">Tilgung</button>
+        <button class="btn btn-prog on" id="b-prog" onclick="toggleSeries('prog')">Prognose</button>
+        <div class="divider-v"></div>
+        <span class="section-label">Kredit</span>
+        <div id="loan-btns" style="display:flex;flex-wrap:wrap;gap:7px"></div>
+      </div>
+      <div class="hint" id="hint-text"></div>
+      <div class="legend" id="chart-legend"></div>
+      <div class="chart-wrap" style="height:340px"><canvas id="c-main"></canvas></div>
+    </div>
+  </div>
+
+  <!-- SIMULATOR -->
+  <div id="tab-sim" class="section">
+    <div class="card">
+      <div class="card-title">Sondertilgungs-Simulator</div>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:14px">Simuliere die Auswirkung einer zusätzlichen Sondertilgung – ohne echten Eintrag.</p>
+      <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:14px">
+        <div class="sim-field">
+          <label>Darlehen</label>
+          <select id="sim-loan" onchange="runSim()">
+            <option value="sv">Sparkassenversicherung (3,17 %)</option>
+            <option value="ak">Anschlusskredit 1 (1,41 %)</option>
+          </select>
+        </div>
+        <div class="sim-field">
+          <label>Betrag: <strong id="sim-amount-out" style="color:var(--text)">7.700 €</strong></label>
+          <input type="range" id="sim-amount" min="1000" max="30000" step="500" value="7700"
+            oninput="runSim();document.getElementById('sim-amount-out').textContent=Number(this.value).toLocaleString('de-DE')+'€'">
+        </div>
+        <div class="sim-field">
+          <label>Zeitpunkt</label>
+          <select id="sim-when" onchange="runSim()">
+            <option value="0">Sofort (April 2026)</option>
+            <option value="6">In 6 Monaten</option>
+            <option value="12">In 1 Jahr</option>
+            <option value="24">In 2 Jahren</option>
+          </select>
+        </div>
+      </div>
+      <div class="sim-result" id="sim-result"></div>
+      <div class="legend" style="margin-top:14px">
+        <span class="leg-item"><span class="leg-dash" style="border-color:var(--green)"></span>Mit Sondertilgung</span>
+        <span class="leg-item"><span class="leg-dash" style="border-color:var(--red)"></span>Ohne Sondertilgung</span>
+      </div>
+      <div class="chart-wrap" style="height:240px"><canvas id="c-sim"></canvas></div>
+    </div>
+  </div>
+
+</div><!-- /content -->
+
+<script>
+const EUR = v => Math.round(v).toLocaleString('de-DE') + ' €';
+const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+
+// ── DATA ────────────────────────────────────────────────────────────
+const IST = [
+  {y:2013,z:3169, t:1198,  s:0,     r:359609},
+  {y:2014,z:9682, t:7545,  s:0,     r:351258},
+  {y:2015,z:10237,t:31476, s:5300,  r:339782},
+  {y:2016,z:9520, t:21604, s:12650, r:318329},
+  {y:2017,z:8888, t:13638, s:5300,  r:304691},
+  {y:2018,z:8597, t:8630,  s:0,     r:296061},
+  {y:2019,z:8348, t:8879,  s:0,     r:287182},
+  {y:2020,z:8092, t:9135,  s:0,     r:278047},
+  {y:2021,z:7829, t:9398,  s:0,     r:268649},
+  {y:2022,z:7557, t:9669,  s:0,     r:258980},
+  {y:2023,z:5784, t:19996, s:4000,  r:252616},
+  {y:2024,z:5212, t:24268, s:7700,  r:229395},
+  {y:2025,z:4815, t:24665, s:7700,  r:205790},
+  {y:2026,z:4244, t:25236, s:7700,  r:181628},
+];
+
+const LOAN_DATA = {
+  all:{rest:[359609,351258,339782,318329,304691,296061,287182,278047,268649,258980,252616,229395,205790,181628],zins:[3169,9682,10237,9520,8888,8597,8348,8092,7829,7557,5784,5212,4815,4244],tilg:[1198,7545,36776,34254,18938,8630,8879,9135,9398,9669,23996,31968,32365,32936]},
+  sv:{rest:[154000,154000,154000,154000,148405,132165,128928,125587,122138,118578,110904,99119,87099,74671],zins:[943,4760,4926,4624,4262,4136,3995,3861,3732,3603,2078,1918,1755,1591],tilg:[0,0,0,0,5595,15840,3237,3342,3449,3559,11785,12482,12644,12810]},
+  ak:{rest:[null,null,null,null,null,null,null,null,null,null,153000,141711,130276,106957],zins:[null,null,null,null,null,null,null,null,null,null,2078,1918,1755,1591],tilg:[null,null,null,null,null,null,null,null,null,null,0,12322,12645,12810]},
+  sp:{rest:[106000,102839,95085,87019,78706,75555,72313,68978,65546,62015,null,null,null,null],zins:[1007,2903,2985,2877,2780,2689,2599,2512,2427,2344,null,null,null,null],tilg:[391,3161,13054,13566,8613,3000,3242,3335,3432,3531,null,null,null,null]},
+  k1:{rest:[50000,48792,47555,46287,44989,43659,42297,40902,39474,38010,null,null,null,null],zins:[600,1175,1165,1155,1145,1136,1127,1118,1109,1101,null,null,null,null],tilg:[208,1208,1237,1268,1299,1330,1362,1394,1429,1463,null,null,null,null]},
+  k2:{rest:[50000,48593,47150,45694,44238,42783,41325,40871,39417,37956,null,null,null,null],zins:[583,1142,1133,1124,1115,1106,1097,1089,1081,1073,null,null,null,null],tilg:[0,1407,1443,1480,1456,1417,1465,1504,1543,1583,null,null,null,null]}
+};
+const YEARS_IST = [2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023,2024,2025,2026];
+const MONTHS12 = ['Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez','Jan 27','Feb','Mär'];
+const REST12   = [201059,199606,198151,196693,195233,193770,192313,183118,181628,181211,179717,178222];
+
+const LOAN_KEYS   = ['all','sv','ak','sp','k1','k2'];
+const LOAN_COLORS = {all:'#888780',sv:'#1D9E75',ak:'#378ADD',sp:'#E24B4A',k1:'#7F77DD',k2:'#EF9F27'};
+const LOAN_INFO   = {
+  all:{name:'Gesamt',status:'active',rows:[{k:'Kredite aktiv',v:'2 von 5'},{k:'Gesamtrestschuld',v:'202.510 €'},{k:'Rate gesamt',v:'1.815 €/Monat'},{k:'Start',v:'September 2013'},{k:'Voraus. Ende',v:'Juli 2035'},{k:'Sondertilgungen',v:'61.050 €'}]},
+  sv:{name:'Sparkassenversicherung',status:'active',rows:[{k:'Ursprungsbetrag',v:'154.000 €'},{k:'Zinssatz',v:'3,17 % p.a.'},{k:'Rate',v:'615,00 €/Monat'},{k:'davon Zinsen (Apr.)',v:'227,03 €'},{k:'davon Tilgung (Apr.)',v:'387,97 €'},{k:'Restschuld (Apr.)',v:'85.553 €'},{k:'Laufzeit',v:'20 Jahre'},{k:'Start',v:'September 2013'},{k:'Voraus. Ende',v:'~2032'},{k:'Sondertilgung max.',v:'7.700 €/Jahr'}]},
+  ak:{name:'Anschlusskredit 1',status:'active',rows:[{k:'Ursprungsbetrag',v:'153.000 €'},{k:'Zinssatz',v:'1,41 % p.a.'},{k:'Rate',v:'1.200,00 €/Monat'},{k:'davon Zinsen (Apr.)',v:'135,72 €'},{k:'davon Tilgung (Apr.)',v:'1.064,28 €'},{k:'Restschuld (Apr.)',v:'115.507 €'},{k:'Laufzeit',v:'15 Jahre'},{k:'Start',v:'Januar 2023'},{k:'Voraus. Ende',v:'Juli 2035'},{k:'Sondertilgung max.',v:'7.650 €/Jahr'}]},
+  sp:{name:'Sparkasse 600652747',status:'done',rows:[{k:'Ursprungsbetrag',v:'106.000 €'},{k:'Zinssatz',v:'2,85 % p.a.'},{k:'Rate',v:'446,09 €/Monat'},{k:'Laufzeit',v:'10 Jahre'},{k:'Start',v:'September 2013'},{k:'Abgelöst',v:'Dezember 2022'},{k:'Gezahlte Zinsen',v:'~26.385 €'},{k:'Sondertilgungen',v:'15.900 €'}]},
+  k1:{name:'KfW Wohnraum selbst nutzen',status:'done',rows:[{k:'Ursprungsbetrag',v:'50.000 €'},{k:'Zinssatz',v:'2,40 % p.a.'},{k:'Rate',v:'199,57 €/Monat'},{k:'Laufzeit',v:'10 Jahre'},{k:'Start',v:'September 2013'},{k:'Abgelöst',v:'Dezember 2022'},{k:'Gezahlte Zinsen',v:'~11.208 €'}]},
+  k2:{name:'KfW 70 Haus',status:'done',rows:[{k:'Ursprungsbetrag',v:'50.000 €'},{k:'Zinssatz',v:'1,40 % p.a.'},{k:'Rate',v:'174,90 €/Monat'},{k:'Laufzeit',v:'10 Jahre'},{k:'Start',v:'September 2013'},{k:'Abgelöst',v:'Dezember 2022'},{k:'Gezahlte Zinsen',v:'~6.570 €'}]},
+};
+const loanLabels = {};
+LOAN_KEYS.forEach(k => loanLabels[k] = LOAN_INFO[k].name);
+
+// ── FORECAST ────────────────────────────────────────────────────────
+function calcForecast(loan, sonderPlan) {
+  if(['sp','k1','k2'].includes(loan)) return {years:[],rest:[],zins:[],tilg:[]};
+  const svRate=0.0317/12, akRate=0.0141/12, svPay=615, akPay=1200;
+  let svR = loan==='ak' ? 0 : 74671;
+  let akR = loan==='sv' ? 0 : 106957;
+  const fY=[],fR=[],fZ=[],fT=[];
+  for(let y=2027;y<=2038;y++){
+    let yZ=0,yT=0;
+    for(let m=0;m<12;m++){
+      if(svR>0){const i=svR*svRate;const p=Math.min(svPay-i,svR);svR=Math.max(0,svR-p);yZ+=i;yT+=p;}
+      if(akR>0){const i=akR*akRate;const p=Math.min(akPay-i,akR);akR=Math.max(0,akR-p);yZ+=i;yT+=p;}
+    }
+    const st=(sonderPlan||{})[y]||0;
+    if(st>0&&svR>0){svR=Math.max(0,svR-st);yT+=st;}
+    const rest=Math.max(0,svR+akR);
+    fY.push(y);fR.push(Math.round(rest));fZ.push(Math.round(yZ));fT.push(Math.round(yT));
+    if(rest===0) break;
+  }
+  return{years:fY,rest:fR,zins:fZ,tilg:fT};
+}
+const SP_PLAN = {2026:7700,2027:7700,2028:7700,2029:7700};
+const fcMit  = calcForecast('all', SP_PLAN);
+const fcOhne = calcForecast('all', {});
+
+// ── TABS ────────────────────────────────────────────────────────────
+function showTab(id, el) {
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  el.classList.add('active');
+}
+
+// ── DARK MODE ───────────────────────────────────────────────────────
+let forceDark = null;
+function toggleDark() {
+  const html = document.documentElement;
+  if(forceDark===null) forceDark = !window.matchMedia('(prefers-color-scheme: dark)').matches;
+  else forceDark = !forceDark;
+  html.style.colorScheme = forceDark ? 'dark' : 'light';
+  document.body.style.background = forceDark ? '#1c1c1e' : '#f5f5f7';
+}
+
+// ── BUILD JAHRES TABLE ──────────────────────────────────────────────
+function buildJahresTable() {
+  const tb = document.getElementById('jahres-body');
+  IST.forEach(r => {
+    const tr = document.createElement('tr');
+    if(r.y===2026) tr.className='current';
+    tr.innerHTML = `<td>${r.y}<span class="tbadge tbadge-active">Ist</span></td><td>${EUR(r.z)}</td><td>${EUR(r.t+r.s)}</td><td>${r.s>0?EUR(r.s):'-'}</td><td>${EUR(r.r)}</td>`;
+    tb.appendChild(tr);
+  });
+  fcMit.years.forEach((y,i) => {
+    const tr = document.createElement('tr');
+    tr.className='forecast';
+    tr.innerHTML = `<td>${y}<span class="tbadge tbadge-fc">Prog.</span></td><td>~${EUR(fcMit.zins[i])}</td><td>~${EUR(fcMit.tilg[i])}</td><td>${SP_PLAN[y]?'~'+EUR(SP_PLAN[y]):'-'}</td><td>~${EUR(fcMit.rest[i])}</td>`;
+    tb.appendChild(tr);
+  });
+  const totalZ = IST.reduce((s,r)=>s+r.z,0)+fcMit.zins.reduce((a,b)=>a+b,0);
+  const totalT = IST.reduce((s,r)=>s+r.t+r.s,0)+fcMit.tilg.reduce((a,b)=>a+b,0);
+  const tr2 = document.createElement('tr'); tr2.className='total';
+  tr2.innerHTML=`<td colspan="2">Gesamt (~22 Jahre)</td><td>~${EUR(totalZ)}</td><td></td><td>0 €</td>`;
+  tb.appendChild(tr2);
+}
+
+// ── BUILD PROGNOSE TABLE ────────────────────────────────────────────
+function buildPrognoseTable() {
+  const pb = document.getElementById('prognose-body');
+  fcMit.years.forEach((y,i) => {
+    const ohne = fcOhne.rest[fcOhne.years.indexOf(y)] || fcMit.rest[i];
+    const ersparnis = Math.max(0, ohne - fcMit.rest[i]);
+    const tr = document.createElement('tr');
+    tr.className = y===2026?'current':'forecast';
+    tr.innerHTML=`<td>${y}</td><td>${EUR(fcMit.rest[i])}</td><td>${EUR(ohne)}</td><td style="color:var(--green)">${ersparnis>0?'− '+EUR(ersparnis):'-'}</td><td>${SP_PLAN[y]?EUR(SP_PLAN[y]):'-'}</td>`;
+    pb.appendChild(tr);
+  });
+}
+
+// ── BUILD MILESTONES ────────────────────────────────────────────────
+function buildMilestones() {
+  const ms = document.getElementById('milestones');
+  [{label:'Schulden unter 150.000 €',when:'Ende 2027'},{label:'Schulden unter 100.000 €',when:'Mitte 2030'},{label:'Sparkassenversicherung abbezahlt',when:'~2032'},{label:'Schulden unter 50.000 €',when:'~2033'},{label:'Vollständige Schuldenfreiheit',when:'Juli 2035'}].forEach(item=>{
+    const d=document.createElement('div');d.className='milestone';
+    d.innerHTML=`<div class="milestone-dot" style="background:var(--amber)"></div><div class="milestone-label">${item.label}</div><div class="milestone-when">${item.when}</div>`;
+    ms.appendChild(d);
+  });
+}
+
+// ── CHARTS ──────────────────────────────────────────────────────────
+const pad = n => Array(n).fill(null);
+
+function buildStaticCharts() {
+  const istY = IST.map(r=>r.y);
+  const istR = IST.map(r=>r.r);
+  const fcY  = fcMit.years;
+  const allL = [...istY,...fcY.filter(y=>y>2026)].map(String);
+  const nIst = istY.length;
+  const fcR_mit  = [istR[istR.length-1],...fcMit.rest.filter((_,i)=>fcY[i]>2026)];
+  const fcR_ohne = [istR[istR.length-1],...fcOhne.rest.filter((_,i)=>fcOhne.years[i]>2026)];
+
+  // Overview 1 – Restschuld
+  new Chart(document.getElementById('c-overview1'),{type:'line',data:{labels:allL,datasets:[
+    {label:'Ist',data:[...istR,...pad(allL.length-nIst)],borderColor:'#1D9E75',backgroundColor:'rgba(29,158,117,0.08)',fill:true,tension:0.3,pointRadius:3,borderWidth:2},
+    {label:'Mit ST',data:[...pad(nIst-1),...fcR_mit],borderColor:'#378ADD',backgroundColor:'rgba(55,138,221,0.05)',fill:true,borderDash:[6,4],tension:0.3,pointRadius:2,borderWidth:2},
+    {label:'Ohne ST',data:[...pad(nIst-1),...fcR_ohne],borderColor:'#EF9F27',borderDash:[6,4],tension:0.3,pointRadius:2,borderWidth:2,backgroundColor:'transparent'},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>Math.round(v/1000)+'k€'}},x:{ticks:{autoSkip:true,maxTicksLimit:10}}}}});
+
+  // Overview 2 – Zinsen vs Tilgung
+  const fcZist = fcMit.zins.filter((_,i)=>fcY[i]>2026);
+  const fcTist = fcMit.tilg.filter((_,i)=>fcY[i]>2026);
+  new Chart(document.getElementById('c-overview2'),{type:'bar',data:{labels:allL,datasets:[
+    {label:'Zinsen (ist)',data:[...IST.map(r=>r.z),...pad(fcZist.length)],backgroundColor:'#E24B4A',stack:'a'},
+    {label:'Tilgung (ist)',data:[...IST.map(r=>r.t+r.s),...pad(fcTist.length)],backgroundColor:'#1D9E75',stack:'a'},
+    {label:'Zinsen (Prognose)',data:[...pad(nIst),...fcZist],backgroundColor:'rgba(228,75,74,0.4)',stack:'a'},
+    {label:'Tilgung (Prognose)',data:[...pad(nIst),...fcTist],backgroundColor:'rgba(29,158,117,0.4)',stack:'a'},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{stacked:true,ticks:{autoSkip:true,maxTicksLimit:10}},y:{stacked:true,ticks:{callback:v=>Math.round(v/1000)+'k€'}}}}});
+
+  // Month chart
+  new Chart(document.getElementById('c-month'),{type:'line',data:{labels:MONTHS12,datasets:[{label:'Restschuld',data:REST12,borderColor:'#1D9E75',backgroundColor:'rgba(29,158,117,0.08)',fill:true,tension:0.3,pointRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>Math.round(v/1000)+'k€'}}}}});
+
+  // Jahres chart
+  new Chart(document.getElementById('c-jahres'),{type:'bar',data:{labels:allL,datasets:[
+    {label:'Zinsen',data:[...IST.map(r=>r.z),...pad(fcZist.length)],backgroundColor:'#E24B4A'},
+    {label:'Prognose',data:[...pad(nIst),...fcZist],backgroundColor:'rgba(228,75,74,0.4)'},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{autoSkip:true,maxTicksLimit:10}}}}});
+
+  // Prognose chart
+  new Chart(document.getElementById('c-prognose'),{type:'line',data:{labels:allL,datasets:[
+    {label:'Ist',data:[...istR,...pad(allL.length-nIst)],borderColor:'#1D9E75',backgroundColor:'rgba(29,158,117,0.08)',fill:true,tension:0.3,pointRadius:3,borderWidth:2},
+    {label:'Mit ST',data:[...pad(nIst-1),...fcR_mit],borderColor:'#378ADD',backgroundColor:'rgba(55,138,221,0.05)',fill:true,borderDash:[6,4],tension:0.3,pointRadius:2,borderWidth:2},
+    {label:'Ohne ST',data:[...pad(nIst-1),...fcR_ohne],borderColor:'#EF9F27',borderDash:[6,4],tension:0.3,pointRadius:2,borderWidth:2,backgroundColor:'transparent'},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>Math.round(v/1000)+'k€'}},x:{ticks:{autoSkip:true,maxTicksLimit:10}}}}});
+}
+
+// ── INTERACTIVE CHART ───────────────────────────────────────────────
+const chartState = {rest:true,zins:false,tilg:false,prog:true,loan:'all'};
+let mainChart = null;
+
+function buildLoanButtons() {
+  const wrap = document.getElementById('loan-btns');
+  wrap.innerHTML = '';
+  document.getElementById('hint-text').textContent = isTouch
+    ? 'Antippen zum Auswählen · i für Details & Umbenennen'
+    : 'Anklicken zum Auswählen · Hover für Details · i zum Umbenennen';
+
+  LOAN_KEYS.forEach(key => {
+    const div = document.createElement('div');
+    div.className = 'loan-btn-wrap';
+
+    const btn = document.createElement('button');
+    btn.className = 'loan-btn' + (key==='all'?' on':'');
+    btn.id = 'lb-'+key;
+
+    const dot = document.createElement('span');
+    dot.className = 'loan-dot';
+    dot.style.background = LOAN_COLORS[key];
+
+    const nameSpan = document.createElement('span');
+    nameSpan.id = 'lbl-'+key;
+    nameSpan.textContent = loanLabels[key];
+
+    const icon = document.createElement('span');
+    icon.className = 'info-icon';
+    icon.textContent = 'i';
+
+    btn.appendChild(dot); btn.appendChild(nameSpan); btn.appendChild(icon);
+
+    const popup = document.createElement('div');
+    popup.className = 'popup' + (isTouch ? '' : ' hover-mode');
+    popup.id = 'popup-'+key;
+    popup.innerHTML = buildPopupHTML(key);
+    popup.addEventListener('click', e => e.stopPropagation());
+
+    div.appendChild(btn); div.appendChild(popup); wrap.appendChild(div);
+
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      if(e.target.closest('.info-icon')) { togglePopup(key); }
+      else { closeAllPopups(); setLoan(key); }
+    });
+  });
+  document.addEventListener('click', closeAllPopups);
+}
+
+function buildPopupHTML(key) {
+  const info = LOAN_INFO[key];
+  const col  = LOAN_COLORS[key];
+  const badge = info.status==='active'
+    ? '<span class="popup-badge badge-active">Aktiv</span>'
+    : '<span class="popup-badge badge-done">Abgelöst</span>';
+  const rows = info.rows.map(r=>`<div class="popup-row"><span class="popup-key">${r.k}</span><span class="popup-val">${r.v}</span></div>`).join('');
+  return `
+    <div class="popup-header">
+      <span class="popup-dot" style="background:${col}"></span>
+      <span class="popup-name" id="pname-${key}">${loanLabels[key]}</span>
+      ${badge}
+      <button class="popup-close" onclick="closeAllPopups(event)">✕</button>
+    </div>
+    ${rows}
+    <div class="popup-rename">
+      <span class="popup-rename-label">Umbenennen</span>
+      <div class="rename-row">
+        <input id="pinp-${key}" value="${loanLabels[key]}" placeholder="${info.name}">
+        <button onclick="saveLoanName('${key}')">Speichern</button>
+      </div>
+      <div class="popup-saved" id="psaved-${key}">Gespeichert</div>
+    </div>`;
+}
+
+function togglePopup(key) {
+  const popup = document.getElementById('popup-'+key);
+  const isOpen = popup.classList.contains('open');
+  closeAllPopups();
+  if(!isOpen) {
+    popup.classList.add('open');
+    const inp = document.getElementById('pinp-'+key);
+    if(inp) inp.value = loanLabels[key];
+  }
+}
+function closeAllPopups(e) {
+  if(e) e.stopPropagation();
+  document.querySelectorAll('.popup').forEach(p=>p.classList.remove('open'));
+}
+function saveLoanName(key) {
+  const inp = document.getElementById('pinp-'+key);
+  const val = inp ? inp.value.trim() : '';
+  if(!val) return;
+  loanLabels[key] = val;
+  const lbl = document.getElementById('lbl-'+key);
+  if(lbl) lbl.textContent = val;
+  const pname = document.getElementById('pname-'+key);
+  if(pname) pname.textContent = val;
+  buildMainChart();
+  const saved = document.getElementById('psaved-'+key);
+  if(saved){saved.style.opacity='1';setTimeout(()=>saved.style.opacity='0',2000);}
+}
+
+function toggleSeries(key) {
+  chartState[key] = !chartState[key];
+  document.getElementById('b-'+key).classList.toggle('on', chartState[key]);
+  buildMainChart();
+}
+function setLoan(loan) {
+  chartState.loan = loan;
+  LOAN_KEYS.forEach(k=>{const b=document.getElementById('lb-'+k);if(b)b.classList.remove('on');});
+  const sel=document.getElementById('lb-'+loan);
+  if(sel) sel.classList.add('on');
+  buildMainChart();
+}
+
+function buildMainChart() {
+  const loan = chartState.loan;
+  const fc = calcForecast(loan, SP_PLAN);
+  const hasFc = fc.years.length>0 && chartState.prog;
+  const istYears = YEARS_IST.filter((_,i) => LOAN_DATA[loan].rest[i]!==null);
+  const nIst = istYears.length;
+  const allYears = hasFc ? [...istYears,...fc.years] : istYears;
+  const labels = allYears.map(String);
+  const pn = n => Array(n).fill(null);
+  const datasets = [];
+  const name = loanLabels[loan];
+  const C = {rest:{s:'#1D9E75',a:'rgba(29,158,117,0.08)'},zins:{s:'#E24B4A'},tilg:{s:'#378ADD'}};
+
+  if(chartState.rest){
+    const d=LOAN_DATA[loan].rest.filter(v=>v!==null);
+    datasets.push({label:name+' – Restschuld',data:d,borderColor:C.rest.s,backgroundColor:C.rest.a,fill:true,tension:0.3,pointRadius:3,borderWidth:2,yAxisID:'y'});
+    if(hasFc) datasets.push({label:name+' – Restschuld (Prognose)',data:[...pn(nIst-1),d[d.length-1],...fc.rest],borderColor:C.rest.s,backgroundColor:'rgba(29,158,117,0.04)',fill:true,borderDash:[6,4],tension:0.3,pointRadius:2,borderWidth:2,yAxisID:'y'});
+  }
+  if(chartState.zins){
+    const d=LOAN_DATA[loan].zins.filter(v=>v!==null);
+    datasets.push({label:name+' – Zinsen/Jahr',data:d,borderColor:C.zins.s,fill:false,tension:0.3,pointRadius:3,borderWidth:2,yAxisID:'y2'});
+    if(hasFc) datasets.push({label:name+' – Zinsen (Prognose)',data:[...pn(nIst-1),d[d.length-1],...fc.zins],borderColor:C.zins.s,borderDash:[6,4],fill:false,tension:0.3,pointRadius:2,borderWidth:2,yAxisID:'y2'});
+  }
+  if(chartState.tilg){
+    const d=LOAN_DATA[loan].tilg.filter(v=>v!==null);
+    datasets.push({label:name+' – Tilgung/Jahr',data:d,borderColor:C.tilg.s,fill:false,tension:0.3,pointRadius:3,borderWidth:2,yAxisID:'y2'});
+    if(hasFc) datasets.push({label:name+' – Tilgung (Prognose)',data:[...pn(nIst-1),d[d.length-1],...fc.tilg],borderColor:C.tilg.s,borderDash:[6,4],fill:false,tension:0.3,pointRadius:2,borderWidth:2,yAxisID:'y2'});
+  }
+
+  const hasY2 = chartState.zins||chartState.tilg;
+  if(mainChart) mainChart.destroy();
+  mainChart = new Chart(document.getElementById('c-main'),{
+    type:'line',data:{labels,datasets},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>{const v=ctx.parsed.y;if(v===null||v===undefined)return null;return ctx.dataset.label+': '+Math.round(v).toLocaleString('de-DE')+' €';}}}},
+      scales:{
+        x:{ticks:{autoSkip:true,maxTicksLimit:12},grid:{color:'rgba(128,128,128,0.08)'}},
+        y:{position:'left',display:chartState.rest,ticks:{callback:v=>Math.round(v/1000)+'k€'},title:{display:true,text:'Restschuld',color:'#1D9E75',font:{size:11}}},
+        y2:{position:'right',display:hasY2,ticks:{callback:v=>Math.round(v/1000)+'k€'},title:{display:true,text:'Zinsen / Tilgung p.a.',color:'#888',font:{size:11}},grid:{drawOnChartArea:false}}
+      }
+    }
+  });
+
+  // Legend
+  const legBox = document.getElementById('chart-legend');
+  legBox.innerHTML = '';
+  datasets.forEach(ds=>{
+    const isDash=(ds.borderDash||[]).length>0;
+    const item=document.createElement('span');item.className='leg-item';
+    item.innerHTML=isDash
+      ?`<span class="leg-dash" style="border-color:${ds.borderColor}"></span>${ds.label}`
+      :`<span class="leg-sq" style="background:${ds.borderColor}"></span>${ds.label}`;
+    legBox.appendChild(item);
+  });
+}
+
+// ── SIMULATOR ───────────────────────────────────────────────────────
+let simChart = null;
+function runSim() {
+  const loan   = document.getElementById('sim-loan').value;
+  const amount = parseInt(document.getElementById('sim-amount').value);
+  const delay  = parseInt(document.getElementById('sim-when').value);
+  const baseRest = loan==='sv' ? 85553 : 115507;
+  const rate     = loan==='sv' ? 0.0317/12 : 0.0141/12;
+  const pay      = loan==='sv' ? 615 : 1200;
+
+  function calc(extraAt, extraAmt) {
+    let r=baseRest,months=0,totalInt=0;
+    while(r>0.01&&months<600){
+      const i=r*rate;totalInt+=i;
+      const p=Math.min(pay-i,r);r-=p;months++;
+      if(months===extraAt) r=Math.max(0,r-extraAmt);
+    }
+    return{months,totalInterest:Math.round(totalInt)};
+  }
+
+  const base    = calc(9999,0);
+  const withSim = calc(delay+1, amount);
+  const savedM  = base.months - withSim.months;
+  const savedI  = base.totalInterest - withSim.totalInterest;
+  const endDate = new Date(2026,3+withSim.months,1);
+  const endStr  = endDate.toLocaleString('de-DE',{month:'long'})+' '+endDate.getFullYear();
+
+  document.getElementById('sim-result').innerHTML = `
+    <div class="sim-metric"><div class="sim-metric-label">Zinsersparnis</div><div class="sim-metric-value pos">− ${EUR(savedI)}</div></div>
+    <div class="sim-metric"><div class="sim-metric-label">Laufzeit kürzer</div><div class="sim-metric-value pos">− ${savedM} Monate</div></div>
+    <div class="sim-metric"><div class="sim-metric-label">Neues Ende</div><div class="sim-metric-value" style="font-size:14px;color:var(--text)">${endStr}</div></div>
+    <div class="sim-metric"><div class="sim-metric-label">Verbleibende Zinsen</div><div class="sim-metric-value" style="color:var(--text)">${EUR(withSim.totalInterest)}</div></div>
+  `;
+
+  const labSim=[],dBase=[],dSim=[];
+  let rb=baseRest,rs=baseRest;
+  for(let m=0;m<=base.months;m+=3){
+    labSim.push(m===0?'Jetzt':'+'+m+'M');
+    dBase.push(Math.round(Math.max(0,rb)));
+    dSim.push(Math.round(Math.max(0,rs)));
+    for(let i=0;i<3;i++){
+      if(rb>0){const int=rb*rate;rb=Math.max(0,rb-(pay-int));}
+      if(rs>0){const int=rs*rate;if(m+i+1===delay+1)rs=Math.max(0,rs-amount);rs=Math.max(0,rs-(pay-int));}
+    }
+  }
+  if(simChart) simChart.destroy();
+  simChart = new Chart(document.getElementById('c-sim'),{
+    type:'line',data:{labels:labSim,datasets:[
+      {label:'Mit ST',data:dSim,borderColor:'#1D9E75',backgroundColor:'rgba(29,158,117,0.08)',fill:true,borderDash:[6,4],tension:0.3,pointRadius:0,borderWidth:2},
+      {label:'Ohne ST',data:dBase,borderColor:'#E24B4A',backgroundColor:'transparent',borderDash:[6,4],tension:0.3,pointRadius:0,borderWidth:2},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>Math.round(v/1000)+'k€'}},x:{ticks:{autoSkip:true,maxTicksLimit:12}}}}
+  });
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────
+buildJahresTable();
+buildPrognoseTable();
+buildMilestones();
+buildStaticCharts();
+buildLoanButtons();
+buildMainChart();
+runSim();
+</script>
+</body>
+</html>
