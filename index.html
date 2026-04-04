@@ -428,39 +428,36 @@
 
   <!-- SIMULATOR -->
   <div id="tab-sim" class="section">
+
+    <!-- Jahresplan -->
     <div class="card">
-      <div class="card-title">Sondertilgungs-Simulator</div>
-      <p style="font-size:13px;color:var(--text2);margin-bottom:14px">Simuliere die Auswirkung einer zusätzlichen Sondertilgung – ohne echten Eintrag.</p>
-      <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:14px">
-        <div class="sim-field">
-          <label>Darlehen</label>
-          <select id="sim-loan" onchange="runSim()">
-            <option value="sv">Sparkassenversicherung (3,17 %)</option>
-            <option value="ak">Anschlusskredit 1 (1,41 %)</option>
-          </select>
-        </div>
-        <div class="sim-field">
-          <label>Betrag: <strong id="sim-amount-out" style="color:var(--text)">7.700 €</strong></label>
-          <input type="range" id="sim-amount" min="1000" max="30000" step="500" value="7700"
-            oninput="runSim();document.getElementById('sim-amount-out').textContent=Number(this.value).toLocaleString('de-DE')+'€'">
-        </div>
-        <div class="sim-field">
-          <label>Zeitpunkt</label>
-          <select id="sim-when" onchange="runSim()">
-            <option value="0">Sofort (April 2026)</option>
-            <option value="6">In 6 Monaten</option>
-            <option value="12">In 1 Jahr</option>
-            <option value="24">In 2 Jahren</option>
-          </select>
-        </div>
-      </div>
-      <div class="sim-result" id="sim-result"></div>
-      <div class="legend" style="margin-top:14px">
-        <span class="leg-item"><span class="leg-dash" style="border-color:var(--green)"></span>Mit Sondertilgung</span>
-        <span class="leg-item"><span class="leg-dash" style="border-color:var(--red)"></span>Ohne Sondertilgung</span>
-      </div>
-      <div class="chart-wrap" style="height:240px"><canvas id="c-sim"></canvas></div>
+      <div class="card-title">Jahresplan – Sondertilgungen pro Jahr</div>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:14px">Trage für jedes Jahr eine geplante Sondertilgung ein. Der Simulator berechnet automatisch die Gesamtauswirkung.</p>
+      <div id="jahresplan-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:14px"></div>
     </div>
+
+    <!-- Einmalige Sondertilgungen -->
+    <div class="card">
+      <div class="card-title">Einmalige Sondertilgungen</div>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:12px">Zusätzliche einmalige Zahlungen zu einem bestimmten Zeitpunkt.</p>
+      <div id="einmalig-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px"></div>
+      <button onclick="addEinmalig()" style="width:100%;padding:10px;border-radius:var(--r-md);border:1.5px dashed var(--border2);background:transparent;font-size:13px;color:var(--text2);cursor:pointer;">+ Einmalige Sondertilgung hinzufügen</button>
+    </div>
+
+    <!-- Ergebnisse -->
+    <div class="card">
+      <div class="card-title">Simulationsergebnis</div>
+      <div class="sim-result" id="sim-result" style="margin-bottom:14px"></div>
+      <div class="legend" style="margin-bottom:10px">
+        <span class="leg-item"><span class="leg-sq" style="background:var(--text3)"></span>Ohne Sondertilgungen</span>
+        <span class="leg-item"><span class="leg-sq" style="background:var(--amber)"></span>Nur Jahresplan</span>
+        <span class="leg-item"><span class="leg-sq" style="background:var(--green)"></span>Jahresplan + Einmalig (gesamt)</span>
+      </div>
+      <div class="chart-wrap" style="height:280px"><canvas id="c-sim"></canvas></div>
+      <!-- Einzelne Einmalige -->
+      <div id="sim-individual" style="margin-top:14px"></div>
+    </div>
+
   </div>
 
 </div><!-- /content -->
@@ -819,57 +816,235 @@ function buildMainChart() {
 }
 
 // ── SIMULATOR ───────────────────────────────────────────────────────
-let simChart = null;
-function runSim() {
-  const loan   = document.getElementById('sim-loan').value;
-  const amount = parseInt(document.getElementById('sim-amount').value);
-  const delay  = parseInt(document.getElementById('sim-when').value);
-  const baseRest = loan==='sv' ? 85553 : 115507;
-  const rate     = loan==='sv' ? 0.0317/12 : 0.0141/12;
-  const pay      = loan==='sv' ? 615 : 1200;
+// Both loans simulated together from current restschuld
+const SIM_START = { sv: 85553, ak: 115507 };
+const SIM_RATE  = { sv: 0.0317/12, ak: 0.0141/12 };
+const SIM_PAY   = { sv: 615, ak: 1200 };
 
-  function calc(extraAt, extraAmt) {
-    let r=baseRest,months=0,totalInt=0;
-    while(r>0.01&&months<600){
-      const i=r*rate;totalInt+=i;
-      const p=Math.min(pay-i,r);r-=p;months++;
-      if(months===extraAt) r=Math.max(0,r-extraAmt);
+// Jahresplan state: year → {sv, ak}
+const jahresplan = {};
+for(let y=2026;y<=2035;y++) jahresplan[y] = {sv:0, ak:0};
+
+// Einmalige list: [{id, loan, month, amount}]  month=0 means now (Apr 2026)
+let einmaligList = [];
+let einmaligId = 0;
+let simChart = null;
+
+function buildJahresplanUI() {
+  const grid = document.getElementById('jahresplan-grid');
+  grid.innerHTML = '';
+  for(let y=2026;y<=2035;y++){
+    const col = document.createElement('div');
+    col.style.cssText = 'background:var(--surface2);border-radius:var(--r-md);padding:12px;';
+    col.innerHTML = `
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px">${y}</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:3px">Sparkassenvers.</div>
+      <input type="number" id="jp-sv-${y}" value="${jahresplan[y].sv||''}" placeholder="0 €"
+        style="width:100%;font-size:13px;padding:5px 8px;border-radius:8px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text);margin-bottom:6px"
+        oninput="jahresplan[${y}].sv=parseInt(this.value)||0;runSim()">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:3px">Anschlusskredit</div>
+      <input type="number" id="jp-ak-${y}" value="${jahresplan[y].ak||''}" placeholder="0 €"
+        style="width:100%;font-size:13px;padding:5px 8px;border-radius:8px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)"
+        oninput="jahresplan[${y}].ak=parseInt(this.value)||0;runSim()">
+    `;
+    grid.appendChild(col);
+  }
+}
+
+function addEinmalig() {
+  const id = ++einmaligId;
+  einmaligList.push({id, loan:'sv', month:0, amount:5000});
+  renderEinmaligList();
+  runSim();
+}
+function removeEinmalig(id) {
+  einmaligList = einmaligList.filter(e=>e.id!==id);
+  renderEinmaligList();
+  runSim();
+}
+function renderEinmaligList() {
+  const list = document.getElementById('einmalig-list');
+  list.innerHTML = '';
+  if(einmaligList.length===0){
+    list.innerHTML='<div style="font-size:13px;color:var(--text3);text-align:center;padding:8px">Noch keine einmaligen Sondertilgungen</div>';
+    return;
+  }
+  einmaligList.forEach(e=>{
+    const row = document.createElement('div');
+    row.style.cssText='display:flex;gap:8px;align-items:center;background:var(--surface2);border-radius:var(--r-md);padding:10px 12px;flex-wrap:wrap';
+    row.innerHTML=`
+      <select onchange="einmaligList.find(x=>x.id===${e.id}).loan=this.value;runSim()"
+        style="font-size:12px;padding:5px 8px;border-radius:8px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text);flex:1;min-width:130px">
+        <option value="sv" ${e.loan==='sv'?'selected':''}>Sparkassenvers.</option>
+        <option value="ak" ${e.loan==='ak'?'selected':''}>Anschlusskredit</option>
+      </select>
+      <select onchange="einmaligList.find(x=>x.id===${e.id}).month=parseInt(this.value);runSim()"
+        style="font-size:12px;padding:5px 8px;border-radius:8px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text);flex:1;min-width:110px">
+        <option value="0" ${e.month===0?'selected':''}>Sofort</option>
+        <option value="3" ${e.month===3?'selected':''}>+3 Monate</option>
+        <option value="6" ${e.month===6?'selected':''}>+6 Monate</option>
+        <option value="12" ${e.month===12?'selected':''}>+1 Jahr</option>
+        <option value="24" ${e.month===24?'selected':''}>+2 Jahre</option>
+        <option value="36" ${e.month===36?'selected':''}>+3 Jahre</option>
+      </select>
+      <input type="number" value="${e.amount}" min="500" step="500"
+        style="font-size:13px;padding:5px 8px;border-radius:8px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text);width:100px"
+        oninput="einmaligList.find(x=>x.id===${e.id}).amount=parseInt(this.value)||0;runSim()">
+      <span style="font-size:12px;color:var(--text3)">€</span>
+      <button onclick="removeEinmalig(${e.id})"
+        style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;padding:0 4px;line-height:1">✕</button>
+    `;
+    list.appendChild(row);
+  });
+}
+
+// Core loan simulator: returns monthly restschuld array
+function simLoan(loan, extras) {
+  // extras: [{month, amount}] — month is 0-indexed from April 2026
+  let r = SIM_START[loan];
+  const rate = SIM_RATE[loan];
+  const pay  = SIM_PAY[loan];
+  const result = [r];
+  for(let m=0; m<200 && r>0.01; m++){
+    const interest = r * rate;
+    const principal = Math.min(pay - interest, r);
+    r = Math.max(0, r - principal);
+    extras.forEach(ex => { if(ex.month === m+1) r = Math.max(0, r - ex.amount); });
+    result.push(Math.round(r));
+  }
+  return result;
+}
+
+// Simulate both loans combined with jahresplan + einmalig extras
+function simCombined(inclJahres, inclEinmalig) {
+  // Build month-indexed extras for each loan
+  const extSv=[], extAk=[];
+
+  if(inclJahres){
+    // Jahresplan: apply in December of each year (month offset from Apr 2026)
+    for(let y=2026;y<=2035;y++){
+      const mOffset = (y===2026) ? 8 : (y-2026)*12 + 8; // Dec of each year
+      if(jahresplan[y].sv > 0) extSv.push({month:mOffset, amount:jahresplan[y].sv});
+      if(jahresplan[y].ak > 0) extAk.push({month:mOffset, amount:jahresplan[y].ak});
     }
-    return{months,totalInterest:Math.round(totalInt)};
   }
 
-  const base    = calc(9999,0);
-  const withSim = calc(delay+1, amount);
-  const savedM  = base.months - withSim.months;
-  const savedI  = base.totalInterest - withSim.totalInterest;
-  const endDate = new Date(2026,3+withSim.months,1);
-  const endStr  = endDate.toLocaleString('de-DE',{month:'long'})+' '+endDate.getFullYear();
+  if(inclEinmalig){
+    einmaligList.forEach(e=>{
+      if(e.loan==='sv') extSv.push({month:e.month, amount:e.amount});
+      else extAk.push({month:e.month, amount:e.amount});
+    });
+  }
+
+  const svArr = simLoan('sv', extSv);
+  const akArr = simLoan('ak', extAk);
+  const len = Math.max(svArr.length, akArr.length);
+  const combined = [];
+  for(let i=0;i<len;i++){
+    combined.push((svArr[i]||0) + (akArr[i]||0));
+  }
+  return combined;
+}
+
+function monthsToEnd(arr) {
+  for(let i=0;i<arr.length;i++) if(arr[i]<=0) return i;
+  return arr.length;
+}
+
+function totalInterest(arr, loan) {
+  let total=0;
+  for(let i=1;i<arr.length;i++){
+    if(arr[i-1]<=0) break;
+    total += arr[i-1] * SIM_RATE[loan];
+  }
+  return Math.round(total);
+}
+
+function runSim() {
+  const dBase   = simCombined(false, false);
+  const dJahres = simCombined(true,  false);
+  const dGesamt = simCombined(true,  true);
+
+  const mBase   = monthsToEnd(dBase);
+  const mJahres = monthsToEnd(dJahres);
+  const mGesamt = monthsToEnd(dGesamt);
+  const maxM    = Math.max(mBase, mJahres, mGesamt);
+
+  const endDate = (m) => {
+    const d = new Date(2026, 3+m, 1);
+    return d.toLocaleString('de-DE',{month:'long'})+' '+d.getFullYear();
+  };
+
+  // Total interest: approximate from combined restschuld
+  const intBase   = Math.round(dBase.reduce((s,v,i)=>i>0&&dBase[i-1]>0?s+dBase[i-1]*((SIM_RATE.sv+SIM_RATE.ak)/2):s,0));
+  const intGesamt = Math.round(dGesamt.reduce((s,v,i)=>i>0&&dGesamt[i-1]>0?s+dGesamt[i-1]*((SIM_RATE.sv+SIM_RATE.ak)/2):s,0));
+  const savedI = intBase - intGesamt;
+  const savedM = mBase - mGesamt;
 
   document.getElementById('sim-result').innerHTML = `
-    <div class="sim-metric"><div class="sim-metric-label">Zinsersparnis</div><div class="sim-metric-value pos">− ${EUR(savedI)}</div></div>
+    <div class="sim-metric"><div class="sim-metric-label">Zinsersparnis gesamt</div><div class="sim-metric-value pos">− ${EUR(savedI)}</div></div>
     <div class="sim-metric"><div class="sim-metric-label">Laufzeit kürzer</div><div class="sim-metric-value pos">− ${savedM} Monate</div></div>
-    <div class="sim-metric"><div class="sim-metric-label">Neues Ende</div><div class="sim-metric-value" style="font-size:14px;color:var(--text)">${endStr}</div></div>
-    <div class="sim-metric"><div class="sim-metric-label">Verbleibende Zinsen</div><div class="sim-metric-value" style="color:var(--text)">${EUR(withSim.totalInterest)}</div></div>
+    <div class="sim-metric"><div class="sim-metric-label">Ende ohne ST</div><div class="sim-metric-value" style="font-size:13px;color:var(--text2)">${endDate(mBase)}</div></div>
+    <div class="sim-metric"><div class="sim-metric-label">Ende mit allem</div><div class="sim-metric-value" style="font-size:13px;color:var(--green)">${endDate(mGesamt)}</div></div>
   `;
 
-  const labSim=[],dBase=[],dSim=[];
-  let rb=baseRest,rs=baseRest;
-  for(let m=0;m<=base.months;m+=3){
-    labSim.push(m===0?'Jetzt':'+'+m+'M');
-    dBase.push(Math.round(Math.max(0,rb)));
-    dSim.push(Math.round(Math.max(0,rs)));
-    for(let i=0;i<3;i++){
-      if(rb>0){const int=rb*rate;rb=Math.max(0,rb-(pay-int));}
-      if(rs>0){const int=rs*rate;if(m+i+1===delay+1)rs=Math.max(0,rs-amount);rs=Math.max(0,rs-(pay-int));}
-    }
+  // Build labels (quarterly)
+  const labels=[];
+  for(let m=0;m<=maxM;m+=3) labels.push(m===0?'Apr 26':'+'+m+'M');
+
+  const trim = arr => {
+    const out=[];
+    for(let m=0;m<=maxM;m+=3) out.push(arr[m]!==undefined ? Math.round(Math.max(0,arr[m])) : 0);
+    return out;
+  };
+
+  const datasets = [
+    {label:'Ohne ST',        data:trim(dBase),   borderColor:'#888780',backgroundColor:'transparent',              borderDash:[4,3],tension:0.3,pointRadius:0,borderWidth:1.5},
+    {label:'Nur Jahresplan', data:trim(dJahres), borderColor:'#EF9F27',backgroundColor:'rgba(239,159,39,0.06)',fill:true,borderDash:[5,3],tension:0.3,pointRadius:0,borderWidth:2},
+    {label:'Jahresplan + Einmalig (gesamt)', data:trim(dGesamt), borderColor:'#1D9E75',backgroundColor:'rgba(29,158,117,0.08)',fill:true,tension:0.3,pointRadius:0,borderWidth:2},
+  ];
+
+  // Individual einmalig lines
+  const indivBox = document.getElementById('sim-individual');
+  indivBox.innerHTML = '';
+  if(einmaligList.length > 0){
+    const indivColors = ['#378ADD','#E24B4A','#7F77DD','#D4537E','#0F6E56'];
+    const indivLegend = document.createElement('div');
+    indivLegend.className = 'legend';
+    indivLegend.style.marginBottom = '8px';
+
+    einmaligList.forEach((e,idx)=>{
+      const col = indivColors[idx % indivColors.length];
+      const extSvI=[], extAkI=[];
+      // jahresplan + this one einmalig
+      for(let y=2026;y<=2035;y++){
+        const mOff=(y===2026)?8:(y-2026)*12+8;
+        if(jahresplan[y].sv>0) extSvI.push({month:mOff,amount:jahresplan[y].sv});
+        if(jahresplan[y].ak>0) extAkI.push({month:mOff,amount:jahresplan[y].ak});
+      }
+      if(e.loan==='sv') extSvI.push({month:e.month,amount:e.amount});
+      else extAkI.push({month:e.month,amount:e.amount});
+      const svA=simLoan('sv',extSvI), akA=simLoan('ak',extAkI);
+      const comb=[]; for(let i=0;i<Math.max(svA.length,akA.length);i++) comb.push((svA[i]||0)+(akA[i]||0));
+
+      const loanName = e.loan==='sv'?'Sparkassenvers.':'Anschlusskredit';
+      const label = `+${e.amount.toLocaleString('de-DE')}€ ${loanName}`;
+      datasets.push({label, data:trim(comb), borderColor:col, backgroundColor:'transparent', borderDash:[3,2], tension:0.3, pointRadius:0, borderWidth:1.5});
+
+      const li=document.createElement('span'); li.className='leg-item';
+      li.innerHTML=`<span class="leg-dash" style="border-color:${col}"></span>${label}`;
+      indivLegend.appendChild(li);
+    });
+    indivBox.appendChild(indivLegend);
   }
+
   if(simChart) simChart.destroy();
   simChart = new Chart(document.getElementById('c-sim'),{
-    type:'line',data:{labels:labSim,datasets:[
-      {label:'Mit ST',data:dSim,borderColor:'#1D9E75',backgroundColor:'rgba(29,158,117,0.08)',fill:true,borderDash:[6,4],tension:0.3,pointRadius:0,borderWidth:2},
-      {label:'Ohne ST',data:dBase,borderColor:'#E24B4A',backgroundColor:'transparent',borderDash:[6,4],tension:0.3,pointRadius:0,borderWidth:2},
-    ]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>Math.round(v/1000)+'k€'}},x:{ticks:{autoSkip:true,maxTicksLimit:12}}}}
+    type:'line', data:{labels, datasets},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>{const v=ctx.parsed.y;if(!v&&v!==0)return null;return ctx.dataset.label+': '+Math.round(v).toLocaleString('de-DE')+' €';}}}},
+      scales:{y:{ticks:{callback:v=>Math.round(v/1000)+'k€'},grid:{color:'rgba(128,128,128,0.08)'}},x:{ticks:{autoSkip:true,maxTicksLimit:12}}}
+    }
   });
 }
 
@@ -880,6 +1055,8 @@ buildMilestones();
 buildStaticCharts();
 buildLoanButtons();
 buildMainChart();
+buildJahresplanUI();
+renderEinmaligList();
 runSim();
 </script>
 </body>
