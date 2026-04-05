@@ -594,39 +594,38 @@ prefersDark.addEventListener('change', e => {
 });
 
 // ── BUILD JAHRES TABLE ──────────────────────────────────────────────
-function buildJahresTable() {
+function buildJahresTable(fcYears, fcRest, fcZins, fcTilg, simPlan) {
   const tb = document.getElementById('jahres-body');
+  tb.innerHTML = '';
+  // Ist rows
   IST.forEach(r => {
     const tr = document.createElement('tr');
     if(r.y===2026) tr.className='current';
     tr.innerHTML = `<td>${r.y}<span class="tbadge tbadge-active">Ist</span></td><td>${EUR(r.z)}</td><td>${EUR(r.t+r.s)}</td><td>${r.s>0?EUR(r.s):'-'}</td><td>${EUR(r.r)}</td>`;
     tb.appendChild(tr);
   });
-  fcMit.years.forEach((y,i) => {
-    const tr = document.createElement('tr');
-    tr.className='forecast';
-    tr.innerHTML = `<td>${y}<span class="tbadge tbadge-fc">Prog.</span></td><td>~${EUR(fcMit.zins[i])}</td><td>~${EUR(fcMit.tilg[i])}</td><td>${SP_PLAN[y]?'~'+EUR(SP_PLAN[y]):'-'}</td><td>~${EUR(fcMit.rest[i])}</td>`;
-    tb.appendChild(tr);
-  });
-  const totalZ = IST.reduce((s,r)=>s+r.z,0)+fcMit.zins.reduce((a,b)=>a+b,0);
-  const totalT = IST.reduce((s,r)=>s+r.t+r.s,0)+fcMit.tilg.reduce((a,b)=>a+b,0);
+  // Prognose rows from sim data
+  if(fcYears && fcYears.length){
+    fcYears.forEach((y,i)=>{
+      // Sum sim ST in this year
+      const stInYear = simPlan ? [...simPlan.sv,...simPlan.ak].filter(e=>{
+        const d=new Date(2026,3+e.month,1); return d.getFullYear()===y;
+      }).reduce((s,e)=>s+e.amount,0) : 0;
+      const tr = document.createElement('tr');
+      tr.className='forecast';
+      tr.innerHTML = `<td>${y}<span class="tbadge tbadge-fc">Prog.</span></td><td>~${EUR(fcZins[i]||0)}</td><td>~${EUR(fcTilg[i]||0)}</td><td>${stInYear>0?'~'+EUR(stInYear):'-'}</td><td>~${EUR(fcRest[i]||0)}</td>`;
+      tb.appendChild(tr);
+    });
+  }
+  const totalZ = IST.reduce((s,r)=>s+r.z,0) + (fcZins||[]).reduce((a,b)=>a+b,0);
+  const totalT = IST.reduce((s,r)=>s+r.t+r.s,0) + (fcTilg||[]).reduce((a,b)=>a+b,0);
   const tr2 = document.createElement('tr'); tr2.className='total';
-  tr2.innerHTML=`<td colspan="2">Gesamt (~22 Jahre)</td><td>~${EUR(totalZ)}</td><td></td><td>0 €</td>`;
+  tr2.innerHTML=`<td colspan="2">Gesamt</td><td>~${EUR(totalZ)}</td><td></td><td>0 €</td>`;
   tb.appendChild(tr2);
 }
 
-// ── BUILD PROGNOSE TABLE ────────────────────────────────────────────
-function buildPrognoseTable() {
-  const pb = document.getElementById('prognose-body');
-  fcMit.years.forEach((y,i) => {
-    const ohne = fcOhne.rest[fcOhne.years.indexOf(y)] || fcMit.rest[i];
-    const ersparnis = Math.max(0, ohne - fcMit.rest[i]);
-    const tr = document.createElement('tr');
-    tr.className = y===2026?'current':'forecast';
-    tr.innerHTML=`<td>${y}</td><td>${EUR(fcMit.rest[i])}</td><td>${EUR(ohne)}</td><td style="color:var(--green)">${ersparnis>0?'− '+EUR(ersparnis):'-'}</td><td>${SP_PLAN[y]?EUR(SP_PLAN[y]):'-'}</td>`;
-    pb.appendChild(tr);
-  });
-}
+// ── BUILD PROGNOSE TABLE — now handled inside updateAllViews ──────────
+function buildPrognoseTable() { /* handled by updateAllViews */ }
 
 // ── BUILD MILESTONES ────────────────────────────────────────────────
 function buildMilestones() {
@@ -649,35 +648,52 @@ function updateAllViews() {
   const simPlan = buildSimPlan();
   const hasSim  = simPlan.sv.length > 0 || simPlan.ak.length > 0;
 
-  // Calc forecasts with simulator data
-  const svArrSim = simLoanFromStart('sv', simPlan.sv);
-  const akArrSim = simLoanFromStart('ak', simPlan.ak);
-  const svArrBase= simLoanFromStart('sv', []);
-  const akArrBase= simLoanFromStart('ak', []);
+  // Calc forecasts — month arrays from April 2026 (index 0 = Apr 2026)
+  const svArrSim  = simLoanFromStart('sv', simPlan.sv);
+  const akArrSim  = simLoanFromStart('ak', simPlan.ak);
+  const svArrBase = simLoanFromStart('sv', []);
+  const akArrBase = simLoanFromStart('ak', []);
+
+  // Combined monthly restschuld (both loans)
+  const maxLen = Math.max(svArrSim.length, akArrSim.length, svArrBase.length, akArrBase.length);
+  const combSim  = Array.from({length:maxLen}, (_,i) => (svArrSim[i]||0)+(akArrSim[i]||0));
+  const combBase = Array.from({length:maxLen}, (_,i) => (svArrBase[i]||0)+(akArrBase[i]||0));
+
+  // The bridge value at end of 2026 = month 8 (Dec 2026 = Apr+8)
+  // We use month 8 as the Dec-2026 snapshot to connect Ist→Prognose
+  const bridgeSim  = combSim[8]  || SIM_START.sv + SIM_START.ak;
+  const bridgeBase = combBase[8] || SIM_START.sv + SIM_START.ak;
 
   const fcSimYears=[], fcSimRest=[], fcSimZins=[], fcSimTilg=[];
   const fcBaseYears=[], fcBaseRest=[];
 
-  // Convert month arrays → yearly snapshots from 2027 onward
+  // Yearly snapshots: Dec of each year = month offset (y-2026)*12 + 8
   for(let y=2027; y<=2038; y++){
-    const mIdx = (y-2026)*12; // month index at start of year y (Jan)
-    const svS = svArrSim[Math.min(mIdx, svArrSim.length-1)]||0;
-    const akS = akArrSim[Math.min(mIdx, akArrSim.length-1)]||0;
-    const svB = svArrBase[Math.min(mIdx, svArrBase.length-1)]||0;
-    const akB = akArrBase[Math.min(mIdx, akArrBase.length-1)]||0;
-    fcSimYears.push(y); fcSimRest.push(Math.round(svS+akS));
-    fcBaseYears.push(y); fcBaseRest.push(Math.round(svB+akB));
+    const mDec = (y-2026)*12 + 8; // December of year y
 
-    // Estimate yearly zinsen/tilgung for sim scenario (approx from month data)
-    const mStart=(y-2027)*12+12, mEnd=mStart+12;
-    let yZ=0,yT=0;
-    for(let m=mStart;m<mEnd;m++){
-      const svPrev=svArrSim[m]||0; if(svPrev>0){const i=svPrev*SIM_RATE.sv;yZ+=i;yT+=Math.min(SIM_PAY.sv-i,svPrev);}
-      const akPrev=akArrSim[m]||0; if(akPrev>0){const i=akPrev*SIM_RATE.ak;yZ+=i;yT+=Math.min(SIM_PAY.ak-i,akPrev);}
+    const rSim  = Math.round(Math.max(0, combSim[Math.min(mDec,  combSim.length-1)]  || 0));
+    const rBase = Math.round(Math.max(0, combBase[Math.min(mDec, combBase.length-1)] || 0));
+
+    fcSimYears.push(y);
+    fcSimRest.push(rSim);
+    fcBaseYears.push(y);
+    fcBaseRest.push(rBase);
+
+    // Yearly zinsen/tilgung: months Jan..Dec of year y = mDec-11 .. mDec
+    const mStart = (y-2026)*12 - 3; // Jan of year y
+    let yZ=0, yT=0;
+    for(let m=mStart; m<mStart+12; m++){
+      if(m<0) continue;
+      const svP = svArrSim[m]||0;
+      const akP = akArrSim[m]||0;
+      if(svP>0){ const i=svP*SIM_RATE.sv; yZ+=i; yT+=Math.min(SIM_PAY.sv-i,svP); }
+      if(akP>0){ const i=akP*SIM_RATE.ak; yZ+=i; yT+=Math.min(SIM_PAY.ak-i,akP); }
     }
-    fcSimZins.push(Math.round(yZ)); fcSimTilg.push(Math.round(yT));
+    fcSimZins.push(Math.round(yZ));
+    fcSimTilg.push(Math.round(yT));
 
-    if(svS+akS<=0 && svB+akB<=0) break;
+    // Stop when both are done
+    if(rSim<=0 && rBase<=0) break;
   }
 
   // End dates
@@ -748,13 +764,21 @@ function updateAllViews() {
     ms.appendChild(d);
   });
 
+  // ── Update Jahresabschlüsse table ──
+  buildJahresTable(fcSimYears, fcSimRest, fcSimZins, fcSimTilg, simPlan);
+
   // ── Rebuild charts ──
   const istY  = IST.map(r=>r.y);
   const istR  = IST.map(r=>r.r);
   const nIst  = istY.length;
-  const allL  = [...istY, ...fcSimYears.filter(y=>y>2026)].map(String);
-  const fcSimR_trimmed = [istR[istR.length-1], ...fcSimRest.filter((_,i)=>fcSimYears[i]>2026)];
-  const fcBaseR_trimmed= [istR[istR.length-1], ...fcBaseRest.filter((_,i)=>fcBaseYears[i]>2026)];
+  const fcYearsFiltered = fcSimYears.filter(y=>y>2026);
+  const allL  = [...istY, ...fcYearsFiltered].map(String);
+
+  // Bridge: connect Ist-2026 → Prognose using Dec-2026 sim value
+  // Ist ends at 2026 = 181.628 (year-end value from table)
+  // Prognose bridge = combSim[8] i.e. Dec 2026 restschuld from sim start
+  const fcSimR_trimmed  = [bridgeSim,  ...fcSimRest.filter((_,i)=>fcSimYears[i]>2026)];
+  const fcBaseR_trimmed = [bridgeBase, ...fcBaseRest.filter((_,i)=>fcBaseYears[i]>2026)];
   const fcZ = fcSimZins.filter((_,i)=>fcSimYears[i]>2026);
   const fcT = fcSimTilg.filter((_,i)=>fcSimYears[i]>2026);
 
@@ -1277,14 +1301,11 @@ function runSim() {
 
 // ── INIT ─────────────────────────────────────────────────────────────
 applyDark(prefersDark.matches);
-buildJahresTable();
-buildPrognoseTable();
-buildMilestones();
-buildStaticCharts();
 buildLoanButtons();
 buildMainChart();
 buildJahresplanUI();
 renderEinmaligList();
+updateAllViews();
 runSim();
 </script>
 </body>
