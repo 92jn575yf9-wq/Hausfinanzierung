@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Hausfinanzierung">
@@ -207,8 +207,14 @@
     .milestone-label { flex: 1; font-size: 13px; color: var(--text); }
     .milestone-when { font-size: 12px; color: var(--text2); white-space: nowrap; }
 
-    /* Hint */
-    .hint { font-size: 11px; color: var(--text3); margin-bottom: 10px; }
+    /* Sim-active banner */
+    .sim-active-banner { background: rgba(55,138,221,0.1); border: 0.5px solid rgba(55,138,221,0.35); border-radius: var(--r-md); padding: 8px 14px; margin-bottom: 14px; font-size: 12px; color: #185FA5; display: none; align-items: center; gap: 8px; }
+    html.dark .sim-active-banner { color: #85B7EB; background: rgba(55,138,221,0.15); }
+    .sim-active-banner.visible { display: flex; }
+    .sim-active-dot { width: 7px; height: 7px; border-radius: 50%; background: #378ADD; flex-shrink: 0; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    html.dark .prognose-item-label { color: #FAC775; }
+    html.dark .prognose-item-value { color: #EF9F27; }
 
     /* History table badges */
     .hist-badge { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
@@ -238,10 +244,14 @@
 
   <!-- ÜBERSICHT -->
   <div id="tab-overview" class="section active">
+    <div class="sim-active-banner" id="sim-banner-overview">
+      <div class="sim-active-dot"></div>
+      <span>Simulationsmodus aktiv – Werte zeigen geplante Sondertilgungen aus dem Simulator</span>
+    </div>
     <div class="prognose-banner">
-      <div><div class="prognose-item-label">Voraussichtliches Ende</div><div class="prognose-item-value">Juli 2035</div></div>
-      <div><div class="prognose-item-label">Restmonate</div><div class="prognose-item-value">~112</div></div>
-      <div><div class="prognose-item-label">Noch zu zahlende Zinsen</div><div class="prognose-item-value">~22.800 €</div></div>
+      <div><div class="prognose-item-label">Voraussichtliches Ende</div><div class="prognose-item-value" id="ov-end">Juli 2035</div></div>
+      <div><div class="prognose-item-label">Restmonate</div><div class="prognose-item-value" id="ov-months">~112</div></div>
+      <div><div class="prognose-item-label">Noch zu zahlende Zinsen</div><div class="prognose-item-value" id="ov-zinsen">~22.800 €</div></div>
       <div><div class="prognose-item-label">Sondertilgungen geleistet</div><div class="prognose-item-value">43.350 €</div></div>
     </div>
     <div class="metric-grid">
@@ -249,8 +259,8 @@
       <div class="metric"><div class="metric-label">Getilgt gesamt</div><div class="metric-value">157.490 €</div><div class="metric-sub">von 360.000 €</div></div>
       <div class="metric"><div class="metric-label">Fortschritt</div><div class="metric-value">43,7 %</div><div class="metric-sub">Tilgungsfortschritt</div></div>
       <div class="metric"><div class="metric-label">Monatliche Rate</div><div class="metric-value">1.815 €</div><div class="metric-sub">beide Kredite</div></div>
-      <div class="metric"><div class="metric-label">Sondertilgungen</div><div class="metric-value">43.350 €</div><div class="metric-sub">geleistet bis heute</div></div>
-      <div class="metric"><div class="metric-label">Laufzeit gesamt</div><div class="metric-value">22 Jahre</div><div class="metric-sub">Sept. 2013 – Juli 2035</div></div>
+      <div class="metric"><div class="metric-label">Sim. Sondertilgungen</div><div class="metric-value" id="ov-sim-st">0 €</div><div class="metric-sub">im Simulator geplant</div></div>
+      <div class="metric"><div class="metric-label">Sim. Ende</div><div class="metric-value" id="ov-sim-end">–</div><div class="metric-sub">mit Simulator-ST</div></div>
     </div>
     <div class="card">
       <div class="card-title">Tilgungsfortschritt</div>
@@ -264,10 +274,10 @@
       </div>
     </div>
     <div class="card">
-      <div class="card-title">Restschuldverlauf + Prognose</div>
+      <div class="card-title" id="ov-chart1-title">Restschuldverlauf + Prognose</div>
       <div class="legend">
         <span class="leg-item"><span class="leg-sq" style="background:var(--green)"></span>Ist-Verlauf</span>
-        <span class="leg-item"><span class="leg-dash" style="border-color:var(--blue)"></span>Mit Sondertilgungen</span>
+        <span class="leg-item"><span class="leg-dash" style="border-color:var(--blue)"></span>Mit Simulator-ST</span>
         <span class="leg-item"><span class="leg-dash" style="border-color:var(--amber)"></span>Ohne Sondertilgungen</span>
       </div>
       <div class="chart-wrap" style="height:280px"><canvas id="c-overview1"></canvas></div>
@@ -392,17 +402,21 @@
 
   <!-- PROGNOSE -->
   <div id="tab-prognose" class="section">
+    <div class="sim-active-banner" id="sim-banner-prognose">
+      <div class="sim-active-dot"></div>
+      <span>Simulationsmodus aktiv – Prognose zeigt Simulator-Sondertilgungen</span>
+    </div>
     <div class="prognose-banner">
-      <div><div class="prognose-item-label">Schuldenfreiheit (ohne ST)</div><div class="prognose-item-value">Juli 2035</div></div>
-      <div><div class="prognose-item-label">Restmonate</div><div class="prognose-item-value">~112</div></div>
+      <div><div class="prognose-item-label">Schuldenfreiheit (ohne ST)</div><div class="prognose-item-value" id="prog-end-ohne">Juli 2035</div></div>
+      <div><div class="prognose-item-label">Schuldenfreiheit (mit ST)</div><div class="prognose-item-value" id="prog-end-mit">–</div></div>
       <div><div class="prognose-item-label">Noch zu zahlen (Raten)</div><div class="prognose-item-value">~203.280 €</div></div>
-      <div><div class="prognose-item-label">Davon Zinsen</div><div class="prognose-item-value">~22.800 €</div></div>
+      <div><div class="prognose-item-label">Zinsen mit Simulator-ST</div><div class="prognose-item-value" id="prog-zinsen-mit">~22.800 €</div></div>
     </div>
     <div class="card">
       <div class="card-title">Restschuld – mit vs. ohne Sondertilgungen</div>
       <div class="legend">
         <span class="leg-item"><span class="leg-sq" style="background:var(--green)"></span>Ist-Verlauf</span>
-        <span class="leg-item"><span class="leg-dash" style="border-color:var(--blue)"></span>Mit Sondertilgungen</span>
+        <span class="leg-item"><span class="leg-dash" style="border-color:var(--blue)"></span>Mit Simulator-ST</span>
         <span class="leg-item"><span class="leg-dash" style="border-color:var(--amber)"></span>Ohne Sondertilgungen</span>
       </div>
       <div class="chart-wrap" style="height:300px"><canvas id="c-prognose"></canvas></div>
@@ -626,48 +640,194 @@ function buildMilestones() {
 
 // ── CHARTS ──────────────────────────────────────────────────────────
 const pad = n => Array(n).fill(null);
+let chartOv1=null, chartOv2=null, chartJahres=null, chartPrognose=null;
 
-function buildStaticCharts() {
-  const istY = IST.map(r=>r.y);
-  const istR = IST.map(r=>r.r);
-  const fcY  = fcMit.years;
-  const allL = [...istY,...fcY.filter(y=>y>2026)].map(String);
-  const nIst = istY.length;
-  const fcR_mit  = [istR[istR.length-1],...fcMit.rest.filter((_,i)=>fcY[i]>2026)];
-  const fcR_ohne = [istR[istR.length-1],...fcOhne.rest.filter((_,i)=>fcOhne.years[i]>2026)];
+function buildStaticCharts() { updateAllViews(); }
 
-  // Overview 1 – Restschuld
-  new Chart(document.getElementById('c-overview1'),{type:'line',data:{labels:allL,datasets:[
+function updateAllViews() {
+  // Get current sim plan (jahresplan + einmalig)
+  const simPlan = buildSimPlan();
+  const hasSim  = simPlan.sv.length > 0 || simPlan.ak.length > 0;
+
+  // Calc forecasts with simulator data
+  const svArrSim = simLoanFromStart('sv', simPlan.sv);
+  const akArrSim = simLoanFromStart('ak', simPlan.ak);
+  const svArrBase= simLoanFromStart('sv', []);
+  const akArrBase= simLoanFromStart('ak', []);
+
+  const fcSimYears=[], fcSimRest=[], fcSimZins=[], fcSimTilg=[];
+  const fcBaseYears=[], fcBaseRest=[];
+
+  // Convert month arrays → yearly snapshots from 2027 onward
+  for(let y=2027; y<=2038; y++){
+    const mIdx = (y-2026)*12; // month index at start of year y (Jan)
+    const svS = svArrSim[Math.min(mIdx, svArrSim.length-1)]||0;
+    const akS = akArrSim[Math.min(mIdx, akArrSim.length-1)]||0;
+    const svB = svArrBase[Math.min(mIdx, svArrBase.length-1)]||0;
+    const akB = akArrBase[Math.min(mIdx, akArrBase.length-1)]||0;
+    fcSimYears.push(y); fcSimRest.push(Math.round(svS+akS));
+    fcBaseYears.push(y); fcBaseRest.push(Math.round(svB+akB));
+
+    // Estimate yearly zinsen/tilgung for sim scenario (approx from month data)
+    const mStart=(y-2027)*12+12, mEnd=mStart+12;
+    let yZ=0,yT=0;
+    for(let m=mStart;m<mEnd;m++){
+      const svPrev=svArrSim[m]||0; if(svPrev>0){const i=svPrev*SIM_RATE.sv;yZ+=i;yT+=Math.min(SIM_PAY.sv-i,svPrev);}
+      const akPrev=akArrSim[m]||0; if(akPrev>0){const i=akPrev*SIM_RATE.ak;yZ+=i;yT+=Math.min(SIM_PAY.ak-i,akPrev);}
+    }
+    fcSimZins.push(Math.round(yZ)); fcSimTilg.push(Math.round(yT));
+
+    if(svS+akS<=0 && svB+akB<=0) break;
+  }
+
+  // End dates
+  const mBase = monthsUntilZero(svArrBase, akArrBase);
+  const mSim  = monthsUntilZero(svArrSim,  akArrSim);
+  const endDateStr = (m) => {
+    const d = new Date(2026, 3+m, 1);
+    return d.toLocaleString('de-DE',{month:'long'})+' '+d.getFullYear();
+  };
+  const endBase = endDateStr(mBase);
+  const endSim  = endDateStr(mSim);
+
+  // Total sim interest (approximate)
+  const simZinsTotal = fcSimZins.reduce((a,b)=>a+b,0) + IST.slice(-1)[0].z;
+  // Planned sim ST total
+  const simSTTotal = [...simPlan.sv,...simPlan.ak].reduce((s,e)=>s+e.amount,0);
+
+  // ── Update Übersicht ──
+  const setEl = (id, val) => { const el=document.getElementById(id); if(el) el.textContent=val; };
+  setEl('ov-end', endBase);
+  setEl('ov-months', '~'+mBase);
+  setEl('ov-zinsen', '~'+EUR(fcBaseRest.reduce((s,v,i,a)=>s+(a[i-1]||SIM_START.sv+SIM_START.ak)*((SIM_RATE.sv+SIM_RATE.ak)/2),0)));
+  setEl('ov-sim-st', hasSim ? EUR(simSTTotal) : '0 €');
+  setEl('ov-sim-end', hasSim ? endSim : '–');
+
+  // Sim banners
+  document.querySelectorAll('.sim-active-banner').forEach(b => b.classList.toggle('visible', hasSim));
+
+  // ── Update Prognose tab ──
+  setEl('prog-end-ohne', endBase);
+  setEl('prog-end-mit', hasSim ? endSim : '–');
+  setEl('prog-zinsen-mit', hasSim ? '~'+EUR(simZinsTotal) : '~22.800 €');
+
+  // Prognose table
+  const pb = document.getElementById('prognose-body');
+  pb.innerHTML='';
+  fcSimYears.forEach((y,i)=>{
+    const ohne = fcBaseRest[i]||0;
+    const mit  = fcSimRest[i]||0;
+    const ersparnis = Math.max(0, ohne-mit);
+    const stInYear = [...simPlan.sv,...simPlan.ak].filter(e=>{
+      const d=new Date(2026,3+e.month,1); return d.getFullYear()===y;
+    }).reduce((s,e)=>s+e.amount,0);
+    const tr=document.createElement('tr');
+    tr.className='forecast';
+    tr.innerHTML=`<td>${y}</td><td>${EUR(mit)}</td><td>${EUR(ohne)}</td><td style="color:var(--green)">${ersparnis>0?'− '+EUR(ersparnis):'-'}</td><td>${stInYear>0?EUR(stInYear):'-'}</td>`;
+    pb.appendChild(tr);
+  });
+
+  // Milestones
+  const ms=document.getElementById('milestones');
+  ms.innerHTML='';
+  const thresholds=[
+    {label:'Schulden unter 150.000 €', target:150000},
+    {label:'Schulden unter 100.000 €', target:100000},
+    {label:'Sparkassenversicherung abbezahlt', target:0, loan:'sv'},
+    {label:'Schulden unter 50.000 €', target:50000},
+    {label:'Vollständige Schuldenfreiheit', target:0},
+  ];
+  thresholds.forEach(th=>{
+    let when='–';
+    const arr = th.loan==='sv' ? svArrSim : [...svArrSim.map((v,i)=>v+(akArrSim[i]||0))];
+    for(let m=0;m<arr.length;m++){
+      if(arr[m]<=th.target){ const d=new Date(2026,3+m,1); when=MONTH_NAMES[d.getMonth()]+' '+d.getFullYear(); break; }
+    }
+    const d=document.createElement('div'); d.className='milestone';
+    d.innerHTML=`<div class="milestone-dot" style="background:var(--amber)"></div><div class="milestone-label">${th.label}</div><div class="milestone-when">${when}</div>`;
+    ms.appendChild(d);
+  });
+
+  // ── Rebuild charts ──
+  const istY  = IST.map(r=>r.y);
+  const istR  = IST.map(r=>r.r);
+  const nIst  = istY.length;
+  const allL  = [...istY, ...fcSimYears.filter(y=>y>2026)].map(String);
+  const fcSimR_trimmed = [istR[istR.length-1], ...fcSimRest.filter((_,i)=>fcSimYears[i]>2026)];
+  const fcBaseR_trimmed= [istR[istR.length-1], ...fcBaseRest.filter((_,i)=>fcBaseYears[i]>2026)];
+  const fcZ = fcSimZins.filter((_,i)=>fcSimYears[i]>2026);
+  const fcT = fcSimTilg.filter((_,i)=>fcSimYears[i]>2026);
+
+  // Overview 1
+  if(chartOv1) chartOv1.destroy();
+  chartOv1 = new Chart(document.getElementById('c-overview1'),{type:'line',data:{labels:allL,datasets:[
     {label:'Ist',data:[...istR,...pad(allL.length-nIst)],borderColor:'#1D9E75',backgroundColor:'rgba(29,158,117,0.08)',fill:true,tension:0.3,pointRadius:3,borderWidth:2},
-    {label:'Mit ST',data:[...pad(nIst-1),...fcR_mit],borderColor:'#378ADD',backgroundColor:'rgba(55,138,221,0.05)',fill:true,borderDash:[6,4],tension:0.3,pointRadius:2,borderWidth:2},
-    {label:'Ohne ST',data:[...pad(nIst-1),...fcR_ohne],borderColor:'#EF9F27',borderDash:[6,4],tension:0.3,pointRadius:2,borderWidth:2,backgroundColor:'transparent'},
+    {label:'Mit Sim-ST',data:[...pad(nIst-1),...fcSimR_trimmed],borderColor:'#378ADD',backgroundColor:'rgba(55,138,221,0.05)',fill:true,borderDash:[6,4],tension:0.3,pointRadius:2,borderWidth:2},
+    {label:'Ohne ST',data:[...pad(nIst-1),...fcBaseR_trimmed],borderColor:'#EF9F27',borderDash:[6,4],tension:0.3,pointRadius:2,borderWidth:2,backgroundColor:'transparent'},
   ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>Math.round(v/1000)+'k€'}},x:{ticks:{autoSkip:true,maxTicksLimit:10}}}}});
 
-  // Overview 2 – Zinsen vs Tilgung
-  const fcZist = fcMit.zins.filter((_,i)=>fcY[i]>2026);
-  const fcTist = fcMit.tilg.filter((_,i)=>fcY[i]>2026);
-  new Chart(document.getElementById('c-overview2'),{type:'bar',data:{labels:allL,datasets:[
-    {label:'Zinsen (ist)',data:[...IST.map(r=>r.z),...pad(fcZist.length)],backgroundColor:'#E24B4A',stack:'a'},
-    {label:'Tilgung (ist)',data:[...IST.map(r=>r.t+r.s),...pad(fcTist.length)],backgroundColor:'#1D9E75',stack:'a'},
-    {label:'Zinsen (Prognose)',data:[...pad(nIst),...fcZist],backgroundColor:'rgba(228,75,74,0.4)',stack:'a'},
-    {label:'Tilgung (Prognose)',data:[...pad(nIst),...fcTist],backgroundColor:'rgba(29,158,117,0.4)',stack:'a'},
+  // Overview 2
+  if(chartOv2) chartOv2.destroy();
+  chartOv2 = new Chart(document.getElementById('c-overview2'),{type:'bar',data:{labels:allL,datasets:[
+    {label:'Zinsen (ist)',data:[...IST.map(r=>r.z),...pad(fcZ.length)],backgroundColor:'#E24B4A',stack:'a'},
+    {label:'Tilgung (ist)',data:[...IST.map(r=>r.t+r.s),...pad(fcT.length)],backgroundColor:'#1D9E75',stack:'a'},
+    {label:'Zinsen (Prognose)',data:[...pad(nIst),...fcZ],backgroundColor:'rgba(228,75,74,0.4)',stack:'a'},
+    {label:'Tilgung (Prognose)',data:[...pad(nIst),...fcT],backgroundColor:'rgba(29,158,117,0.4)',stack:'a'},
   ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{stacked:true,ticks:{autoSkip:true,maxTicksLimit:10}},y:{stacked:true,ticks:{callback:v=>Math.round(v/1000)+'k€'}}}}});
 
-  // Month chart
-  new Chart(document.getElementById('c-month'),{type:'line',data:{labels:MONTHS12,datasets:[{label:'Restschuld',data:REST12,borderColor:'#1D9E75',backgroundColor:'rgba(29,158,117,0.08)',fill:true,tension:0.3,pointRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>Math.round(v/1000)+'k€'}}}}});
+  // Month chart (static — not affected by sim)
+  if(!document.getElementById('c-month')._chartBuilt){
+    new Chart(document.getElementById('c-month'),{type:'line',data:{labels:MONTHS12,datasets:[{label:'Restschuld',data:REST12,borderColor:'#1D9E75',backgroundColor:'rgba(29,158,117,0.08)',fill:true,tension:0.3,pointRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>Math.round(v/1000)+'k€'}}}}});
+    document.getElementById('c-month')._chartBuilt=true;
+  }
 
   // Jahres chart
-  new Chart(document.getElementById('c-jahres'),{type:'bar',data:{labels:allL,datasets:[
-    {label:'Zinsen',data:[...IST.map(r=>r.z),...pad(fcZist.length)],backgroundColor:'#E24B4A'},
-    {label:'Prognose',data:[...pad(nIst),...fcZist],backgroundColor:'rgba(228,75,74,0.4)'},
+  if(chartJahres) chartJahres.destroy();
+  chartJahres = new Chart(document.getElementById('c-jahres'),{type:'bar',data:{labels:allL,datasets:[
+    {label:'Zinsen',data:[...IST.map(r=>r.z),...pad(fcZ.length)],backgroundColor:'#E24B4A'},
+    {label:'Prognose',data:[...pad(nIst),...fcZ],backgroundColor:'rgba(228,75,74,0.4)'},
   ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{autoSkip:true,maxTicksLimit:10}}}}});
 
   // Prognose chart
-  new Chart(document.getElementById('c-prognose'),{type:'line',data:{labels:allL,datasets:[
+  if(chartPrognose) chartPrognose.destroy();
+  chartPrognose = new Chart(document.getElementById('c-prognose'),{type:'line',data:{labels:allL,datasets:[
     {label:'Ist',data:[...istR,...pad(allL.length-nIst)],borderColor:'#1D9E75',backgroundColor:'rgba(29,158,117,0.08)',fill:true,tension:0.3,pointRadius:3,borderWidth:2},
-    {label:'Mit ST',data:[...pad(nIst-1),...fcR_mit],borderColor:'#378ADD',backgroundColor:'rgba(55,138,221,0.05)',fill:true,borderDash:[6,4],tension:0.3,pointRadius:2,borderWidth:2},
-    {label:'Ohne ST',data:[...pad(nIst-1),...fcR_ohne],borderColor:'#EF9F27',borderDash:[6,4],tension:0.3,pointRadius:2,borderWidth:2,backgroundColor:'transparent'},
+    {label:'Mit Sim-ST',data:[...pad(nIst-1),...fcSimR_trimmed],borderColor:'#378ADD',backgroundColor:'rgba(55,138,221,0.05)',fill:true,borderDash:[6,4],tension:0.3,pointRadius:2,borderWidth:2},
+    {label:'Ohne ST',data:[...pad(nIst-1),...fcBaseR_trimmed],borderColor:'#EF9F27',borderDash:[6,4],tension:0.3,pointRadius:2,borderWidth:2,backgroundColor:'transparent'},
   ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>Math.round(v/1000)+'k€'}},x:{ticks:{autoSkip:true,maxTicksLimit:10}}}}});
+}
+
+// Helper: build unified extras arrays from current sim state
+function buildSimPlan() {
+  const sv=[], ak=[];
+  for(let y=2026;y<=2035;y++){
+    if(jahresplan[y].sv>0){ const off=toOffset(y,jahresplan[y].svMonth); if(off>=0) sv.push({month:off,amount:jahresplan[y].sv}); }
+    if(jahresplan[y].ak>0){ const off=toOffset(y,jahresplan[y].akMonth); if(off>=0) ak.push({month:off,amount:jahresplan[y].ak}); }
+  }
+  einmaligList.forEach(e=>{
+    if(e.loan==='sv') sv.push({month:e.offset,amount:e.amount});
+    else ak.push({month:e.offset,amount:e.amount});
+  });
+  return {sv,ak};
+}
+
+// Helper: simulate from current restschuld, return monthly array
+function simLoanFromStart(loan, extras) {
+  let r=SIM_START[loan];
+  const rate=SIM_RATE[loan], pay=SIM_PAY[loan];
+  const result=[r];
+  for(let m=0;m<200&&r>0.01;m++){
+    const i=r*rate; const p=Math.min(pay-i,r); r=Math.max(0,r-p);
+    extras.forEach(ex=>{if(ex.month===m+1) r=Math.max(0,r-ex.amount);});
+    result.push(Math.round(r));
+  }
+  return result;
+}
+
+function monthsUntilZero(svArr, akArr) {
+  const len=Math.max(svArr.length,akArr.length);
+  for(let m=0;m<len;m++) if((svArr[m]||0)+(akArr[m]||0)<=0) return m;
+  return len;
 }
 
 // ── INTERACTIVE CHART ───────────────────────────────────────────────
@@ -1110,6 +1270,9 @@ function runSim() {
       scales:{y:{ticks:{callback:v=>Math.round(v/1000)+'k€'},grid:{color:'rgba(128,128,128,0.08)'}},x:{ticks:{autoSkip:true,maxTicksLimit:12}}}
     }
   });
+
+  // Propagate sim values to all other views
+  updateAllViews();
 }
 
 // ── INIT ─────────────────────────────────────────────────────────────
