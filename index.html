@@ -265,12 +265,12 @@
     <div class="card">
       <div class="card-title">Tilgungsfortschritt</div>
       <div class="progress-wrap">
-        <div class="progress-label"><span>Sparkassenversicherung</span><span>85.553 € verbleibend</span></div>
-        <div class="progress-bar"><div class="progress-fill" style="width:44%;background:var(--green)"></div></div>
+        <div class="progress-label"><span>Sparkassenversicherung</span><span id="prog-sv-rest">85.553 € verbleibend</span></div>
+        <div class="progress-bar"><div class="progress-fill" id="prog-sv-bar" style="width:44%;background:var(--green)"></div></div>
       </div>
       <div class="progress-wrap">
-        <div class="progress-label"><span>Anschlusskredit 1</span><span>115.507 € verbleibend</span></div>
-        <div class="progress-bar"><div class="progress-fill" style="width:24%;background:var(--blue)"></div></div>
+        <div class="progress-label"><span>Anschlusskredit 1</span><span id="prog-ak-rest">115.507 € verbleibend</span></div>
+        <div class="progress-bar"><div class="progress-fill" id="prog-ak-bar" style="width:24%;background:var(--blue)"></div></div>
       </div>
     </div>
     <div class="card">
@@ -296,6 +296,10 @@
 
   <!-- MONAT -->
   <div id="tab-month" class="section">
+    <div class="sim-active-banner" id="sim-banner-month">
+      <div class="sim-active-dot"></div>
+      <span>Simulationsmodus aktiv – Monatswerte zeigen April 2026 (Sondertilgungen wirken ab ihrem eingetragenen Zeitpunkt)</span>
+    </div>
     <div class="card">
       <div class="card-title">April 2026</div>
       <div class="month-grid">
@@ -329,6 +333,10 @@
 
   <!-- DARLEHEN -->
   <div id="tab-loans" class="section">
+    <div class="sim-active-banner" id="sim-banner-loans">
+      <div class="sim-active-dot"></div>
+      <span>Simulationsmodus aktiv – * zeigt Restschuld bei Vertragsende mit Simulator-ST</span>
+    </div>
     <div class="metric-grid">
       <div class="metric"><div class="metric-label">Aktive Kredite</div><div class="metric-value">2</div><div class="metric-sub">von urspr. 5</div></div>
       <div class="metric"><div class="metric-label">Abgelöste Kredite</div><div class="metric-value">3</div><div class="metric-sub">Sparkasse, KfW x2</div></div>
@@ -339,15 +347,15 @@
       <div class="loan-grid">
         <div class="loan-card">
           <div class="loan-card-name">Sparkassenversicherung</div>
-          <div class="loan-card-rest">85.553 €</div>
-          <div class="loan-card-meta">3,17 % · 615 €/Monat · Ende ~2032</div>
-          <div class="loan-bar"><div class="loan-bar-fill" style="width:44%;background:var(--green)"></div></div>
+          <div class="loan-card-rest" id="lc-sv-rest">85.553 €</div>
+          <div class="loan-card-meta">3,17 % · 615 €/Monat · Ende ~2033</div>
+          <div class="loan-bar"><div class="loan-bar-fill" id="lc-sv-bar" style="width:44%;background:var(--green)"></div></div>
         </div>
         <div class="loan-card">
           <div class="loan-card-name">Anschlusskredit 1</div>
-          <div class="loan-card-rest">115.507 €</div>
+          <div class="loan-card-rest" id="lc-ak-rest">115.507 €</div>
           <div class="loan-card-meta">1,41 % · 1.200 €/Monat · Ende 2035</div>
-          <div class="loan-bar"><div class="loan-bar-fill" style="width:24%;background:var(--blue)"></div></div>
+          <div class="loan-bar"><div class="loan-bar-fill" id="lc-ak-bar" style="width:24%;background:var(--blue)"></div></div>
         </div>
       </div>
     </div>
@@ -755,10 +763,32 @@ function updateAllViews() {
     setText('ov-sim-end-sub',  'mit Simulator-ST');
   }
 
-  // Sim banners
+  // Sim banners (all tabs)
   document.querySelectorAll('.sim-active-banner').forEach(b => b.classList.toggle('visible', hasSim));
 
-  // ── Update Prognose tab ──
+  // ── Update Tilgungsfortschritt & Darlehenskarten ──
+  // Show end-of-contract restschuld (with sim ST applied)
+  const svEndRest  = Math.round(Math.max(0, svArrSim[SIM_MAXMONTH.sv] || SIM_START.sv));
+  const akEndRest  = Math.round(Math.max(0, akArrSim[SIM_MAXMONTH.ak] || SIM_START.ak));
+  const svOriginal = 154000, akOriginal = 153000;
+  const svPct = Math.max(0, Math.min(100, Math.round((1 - svEndRest/svOriginal)*100)));
+  const akPct = Math.max(0, Math.min(100, Math.round((1 - akEndRest/akOriginal)*100)));
+
+  // Progress bars (Übersicht)
+  setEl('prog-sv-rest', EUR(svEndRest) + (hasSim ? ' bei Vertragsende' : ' verbleibend'));
+  setEl('prog-ak-rest', EUR(akEndRest) + (hasSim ? ' bei Vertragsende' : ' verbleibend'));
+  const svBar = document.getElementById('prog-sv-bar');
+  const akBar = document.getElementById('prog-ak-bar');
+  if(svBar) svBar.style.width = svPct+'%';
+  if(akBar) akBar.style.width = akPct+'%';
+
+  // Loan cards (Darlehen Tab)
+  setEl('lc-sv-rest', EUR(svEndRest) + (hasSim ? '*' : ''));
+  setEl('lc-ak-rest', EUR(akEndRest) + (hasSim ? '*' : ''));
+  const lcSvBar = document.getElementById('lc-sv-bar');
+  const lcAkBar = document.getElementById('lc-ak-bar');
+  if(lcSvBar) lcSvBar.style.width = svPct+'%';
+  if(lcAkBar) lcAkBar.style.width = akPct+'%';
   setEl('prog-end-ohne', endBase);
   setEl('prog-end-mit', hasSim ? endSim : '–');
   setEl('prog-zinsen-mit', hasSim ? '~'+EUR(simZinsTotal) : '~22.800 €');
