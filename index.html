@@ -40,6 +40,26 @@
         --text3: #6e6e73;
       }
     }
+    html.dark {
+      --bg: #1c1c1e;
+      --surface: #2c2c2e;
+      --surface2: #3a3a3c;
+      --border: rgba(255,255,255,0.1);
+      --border2: rgba(255,255,255,0.18);
+      --text: #f5f5f7;
+      --text2: #aeaeb2;
+      --text3: #6e6e73;
+    }
+    html.light {
+      --bg: #f5f5f7;
+      --surface: #ffffff;
+      --surface2: #f0f0f2;
+      --border: rgba(0,0,0,0.1);
+      --border2: rgba(0,0,0,0.18);
+      --text: #1d1d1f;
+      --text2: #6e6e73;
+      --text3: #aeaeb2;
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
@@ -221,15 +241,15 @@
     <div class="prognose-banner">
       <div><div class="prognose-item-label">Voraussichtliches Ende</div><div class="prognose-item-value">Juli 2035</div></div>
       <div><div class="prognose-item-label">Restmonate</div><div class="prognose-item-value">~112</div></div>
-      <div><div class="prognose-item-label">Noch zu zahlende Zinsen</div><div class="prognose-item-value">~18.400 €</div></div>
-      <div><div class="prognose-item-label">Geplante Sondertilgungen</div><div class="prognose-item-value">~38.500 €</div></div>
+      <div><div class="prognose-item-label">Noch zu zahlende Zinsen</div><div class="prognose-item-value">~22.800 €</div></div>
+      <div><div class="prognose-item-label">Sondertilgungen geleistet</div><div class="prognose-item-value">43.350 €</div></div>
     </div>
     <div class="metric-grid">
       <div class="metric"><div class="metric-label">Gesamtrestschuld</div><div class="metric-value">202.510 €</div><div class="metric-sub">April 2026</div></div>
       <div class="metric"><div class="metric-label">Getilgt gesamt</div><div class="metric-value">157.490 €</div><div class="metric-sub">von 360.000 €</div></div>
       <div class="metric"><div class="metric-label">Fortschritt</div><div class="metric-value">43,7 %</div><div class="metric-sub">Tilgungsfortschritt</div></div>
       <div class="metric"><div class="metric-label">Monatliche Rate</div><div class="metric-value">1.815 €</div><div class="metric-sub">beide Kredite</div></div>
-      <div class="metric"><div class="metric-label">Sondertilgungen</div><div class="metric-value">61.050 €</div><div class="metric-sub">bis heute</div></div>
+      <div class="metric"><div class="metric-label">Sondertilgungen</div><div class="metric-value">43.350 €</div><div class="metric-sub">geleistet bis heute</div></div>
       <div class="metric"><div class="metric-label">Laufzeit gesamt</div><div class="metric-value">22 Jahre</div><div class="metric-sub">Sept. 2013 – Juli 2035</div></div>
     </div>
     <div class="card">
@@ -302,7 +322,7 @@
     <div class="metric-grid">
       <div class="metric"><div class="metric-label">Aktive Kredite</div><div class="metric-value">2</div><div class="metric-sub">von urspr. 5</div></div>
       <div class="metric"><div class="metric-label">Abgelöste Kredite</div><div class="metric-value">3</div><div class="metric-sub">Sparkasse, KfW x2</div></div>
-      <div class="metric"><div class="metric-label">Sondertilgungen</div><div class="metric-value">61.050 €</div><div class="metric-sub">bis heute</div></div>
+      <div class="metric"><div class="metric-label">Sondertilgungen</div><div class="metric-value">43.350 €</div><div class="metric-sub">geleistet bis heute</div></div>
     </div>
     <div class="card">
       <div class="card-title">Aktive Darlehen</div>
@@ -342,11 +362,7 @@
             <tr><td>2023</td><td>Dez</td><td>Sparkkassenvers.</td><td>4.000 €</td></tr>
             <tr><td>2024</td><td>Apr</td><td>Sparkkassenvers.</td><td>7.700 €</td></tr>
             <tr><td>2025</td><td>Nov</td><td>Sparkkassenvers.</td><td>7.700 €</td></tr>
-            <tr><td>2026</td><td>Okt</td><td>Sparkkassenvers.</td><td>7.700 €</td></tr>
-            <tr><td>2027</td><td>Okt</td><td>Sparkkassenvers.</td><td>7.700 €</td></tr>
-            <tr><td>2028</td><td>Okt</td><td>Sparkkassenvers.</td><td>7.700 €</td></tr>
-            <tr><td>2029</td><td>Okt</td><td>Sparkkassenvers.</td><td>7.700 €</td></tr>
-            <tr class="total"><td colspan="3">Summe</td><td>75.750 €</td></tr>
+            <tr class="total"><td colspan="3">Summe (geleistet)</td><td>43.350 €</td></tr>
           </tbody>
         </table>
       </div>
@@ -377,10 +393,10 @@
   <!-- PROGNOSE -->
   <div id="tab-prognose" class="section">
     <div class="prognose-banner">
-      <div><div class="prognose-item-label">Schuldenfreiheit</div><div class="prognose-item-value">Juli 2035</div></div>
+      <div><div class="prognose-item-label">Schuldenfreiheit (ohne ST)</div><div class="prognose-item-value">Juli 2035</div></div>
       <div><div class="prognose-item-label">Restmonate</div><div class="prognose-item-value">~112</div></div>
       <div><div class="prognose-item-label">Noch zu zahlen (Raten)</div><div class="prognose-item-value">~203.280 €</div></div>
-      <div><div class="prognose-item-label">Davon Zinsen</div><div class="prognose-item-value">~18.400 €</div></div>
+      <div><div class="prognose-item-label">Davon Zinsen</div><div class="prognose-item-value">~22.800 €</div></div>
     </div>
     <div class="card">
       <div class="card-title">Restschuld – mit vs. ohne Sondertilgungen</div>
@@ -499,7 +515,7 @@ const REST12   = [201059,199606,198151,196693,195233,193770,192313,183118,181628
 const LOAN_KEYS   = ['all','sv','ak','sp','k1','k2'];
 const LOAN_COLORS = {all:'#888780',sv:'#1D9E75',ak:'#378ADD',sp:'#E24B4A',k1:'#7F77DD',k2:'#EF9F27'};
 const LOAN_INFO   = {
-  all:{name:'Gesamt',status:'active',rows:[{k:'Kredite aktiv',v:'2 von 5'},{k:'Gesamtrestschuld',v:'202.510 €'},{k:'Rate gesamt',v:'1.815 €/Monat'},{k:'Start',v:'September 2013'},{k:'Voraus. Ende',v:'Juli 2035'},{k:'Sondertilgungen',v:'61.050 €'}]},
+  all:{name:'Gesamt',status:'active',rows:[{k:'Kredite aktiv',v:'2 von 5'},{k:'Gesamtrestschuld',v:'202.510 €'},{k:'Rate gesamt',v:'1.815 €/Monat'},{k:'Start',v:'September 2013'},{k:'Voraus. Ende',v:'Juli 2035'},{k:'Sondertilgungen',v:'43.350 €'}]},
   sv:{name:'Sparkassenversicherung',status:'active',rows:[{k:'Ursprungsbetrag',v:'154.000 €'},{k:'Zinssatz',v:'3,17 % p.a.'},{k:'Rate',v:'615,00 €/Monat'},{k:'davon Zinsen (Apr.)',v:'227,03 €'},{k:'davon Tilgung (Apr.)',v:'387,97 €'},{k:'Restschuld (Apr.)',v:'85.553 €'},{k:'Laufzeit',v:'20 Jahre'},{k:'Start',v:'September 2013'},{k:'Voraus. Ende',v:'~2032'},{k:'Sondertilgung max.',v:'7.700 €/Jahr'}]},
   ak:{name:'Anschlusskredit 1',status:'active',rows:[{k:'Ursprungsbetrag',v:'153.000 €'},{k:'Zinssatz',v:'1,41 % p.a.'},{k:'Rate',v:'1.200,00 €/Monat'},{k:'davon Zinsen (Apr.)',v:'135,72 €'},{k:'davon Tilgung (Apr.)',v:'1.064,28 €'},{k:'Restschuld (Apr.)',v:'115.507 €'},{k:'Laufzeit',v:'15 Jahre'},{k:'Start',v:'Januar 2023'},{k:'Voraus. Ende',v:'Juli 2035'},{k:'Sondertilgung max.',v:'7.650 €/Jahr'}]},
   sp:{name:'Sparkasse 600652747',status:'done',rows:[{k:'Ursprungsbetrag',v:'106.000 €'},{k:'Zinssatz',v:'2,85 % p.a.'},{k:'Rate',v:'446,09 €/Monat'},{k:'Laufzeit',v:'10 Jahre'},{k:'Start',v:'September 2013'},{k:'Abgelöst',v:'Dezember 2022'},{k:'Gezahlte Zinsen',v:'~26.385 €'},{k:'Sondertilgungen',v:'15.900 €'}]},
@@ -530,7 +546,7 @@ function calcForecast(loan, sonderPlan) {
   }
   return{years:fY,rest:fR,zins:fZ,tilg:fT};
 }
-const SP_PLAN = {2026:7700,2027:7700,2028:7700,2029:7700};
+const SP_PLAN = {};
 const fcMit  = calcForecast('all', SP_PLAN);
 const fcOhne = calcForecast('all', {});
 
@@ -543,14 +559,25 @@ function showTab(id, el) {
 }
 
 // ── DARK MODE ───────────────────────────────────────────────────────
+const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
 let forceDark = null;
-function toggleDark() {
+
+function applyDark(dark) {
   const html = document.documentElement;
-  if(forceDark===null) forceDark = !window.matchMedia('(prefers-color-scheme: dark)').matches;
-  else forceDark = !forceDark;
-  html.style.colorScheme = forceDark ? 'dark' : 'light';
-  document.body.style.background = forceDark ? '#1c1c1e' : '#f5f5f7';
+  html.classList.toggle('dark', dark);
+  html.classList.toggle('light', !dark);
+  document.body.style.background = getComputedStyle(html).getPropertyValue('--bg').trim();
 }
+
+function toggleDark() {
+  if(forceDark === null) forceDark = !prefersDark.matches;
+  else forceDark = !forceDark;
+  applyDark(forceDark);
+}
+
+prefersDark.addEventListener('change', e => {
+  if(forceDark === null) applyDark(e.matches);
+});
 
 // ── BUILD JAHRES TABLE ──────────────────────────────────────────────
 function buildJahresTable() {
@@ -1086,6 +1113,7 @@ function runSim() {
 }
 
 // ── INIT ─────────────────────────────────────────────────────────────
+applyDark(prefersDark.matches);
 buildJahresTable();
 buildPrognoseTable();
 buildMilestones();
