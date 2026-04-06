@@ -669,7 +669,7 @@ function updateAllViews() {
   // Correct offsets from Dec 2026:
   // Dec of year y = (y-2026)*12
   // Jan of year y = (y-2027)*12 + 1  (for y>=2027)
-  for(let y=2027; y<=2038; y++){
+  for(let y=2027; y<=2035; y++){
     const mDec = (y-2026)*12;
     const mJan = (y-2027)*12 + 1;
 
@@ -751,29 +751,32 @@ function updateAllViews() {
 
   document.querySelectorAll('.sim-active-banner').forEach(b=>b.classList.toggle('visible',hasSim));
 
-  // Tilgungsfortschritt & Darlehenskarten
-  const svEndRest = Math.round(svArrSim[SIM_MAXMONTH.sv]||0);
-  const akEndRest = Math.round(akArrSim[SIM_MAXMONTH.ak]||0);
-  const svPct = Math.max(0,Math.min(100,Math.round((1-svEndRest/154000)*100)));
-  const akPct = Math.max(0,Math.min(100,Math.round((1-akEndRest/153000)*100)));
-  setEl('prog-sv-rest', EUR(svEndRest)+(hasSim?' bei Vertragsende':' verbleibend'));
-  setEl('prog-ak-rest', EUR(akEndRest)+(hasSim?' bei Vertragsende':' verbleibend'));
+  // ── Tilgungsfortschritt & Darlehenskarten ──
+  // Always show CURRENT April 2026 values (independent of simulator)
+  const SV_CURRENT = 85552.84;
+  const AK_CURRENT = 115506.52;
+  const svPct = Math.max(0, Math.min(100, Math.round((1 - SV_CURRENT/154000)*100)));
+  const akPct = Math.max(0, Math.min(100, Math.round((1 - AK_CURRENT/153000)*100)));
+  setEl('prog-sv-rest', EUR(SV_CURRENT) + ' verbleibend');
+  setEl('prog-ak-rest', EUR(AK_CURRENT) + ' verbleibend');
   const svBar=document.getElementById('prog-sv-bar'); if(svBar) svBar.style.width=svPct+'%';
   const akBar=document.getElementById('prog-ak-bar'); if(akBar) akBar.style.width=akPct+'%';
-  setEl('lc-sv-rest', EUR(svEndRest)+(hasSim?'*':''));
-  setEl('lc-ak-rest', EUR(akEndRest)+(hasSim?'*':''));
+
+  // Loan cards (Darlehen Tab) — also current values, no sim influence
+  setEl('lc-sv-rest', EUR(SV_CURRENT));
+  setEl('lc-ak-rest', EUR(AK_CURRENT));
   const lcSvBar=document.getElementById('lc-sv-bar'); if(lcSvBar) lcSvBar.style.width=svPct+'%';
   const lcAkBar=document.getElementById('lc-ak-bar'); if(lcAkBar) lcAkBar.style.width=akPct+'%';
 
-  // Prognose Banner
+  // ── Prognose Banner ──
   setEl('prog-end-ohne',   endBase);
   setEl('prog-end-mit',    hasSim?endSim:'–');
   setEl('prog-zinsen-mit', hasSim?'~'+EUR(simZinsTotal):'~'+EUR(baseZinsTotal));
 
-  // Prognose Tabelle
+  // ── Prognose Tabelle — capped at 2035 ──
   const pb=document.getElementById('prognose-body');
   pb.innerHTML='';
-  fcSimYears.forEach((y,i)=>{
+  fcSimYears.filter(y=>y<=2035).forEach((y,i)=>{
     const ohne=fcBaseRest[i]||0, mit=fcSimRest[i]||0;
     const ersparnis=Math.max(0,ohne-mit);
     const stInYear=[...simPlan.sv,...simPlan.ak].filter(e=>{
@@ -784,7 +787,8 @@ function updateAllViews() {
     pb.appendChild(tr);
   });
 
-  // Meilensteine
+  // ── Meilensteine — capped at Dec 2035 ──
+  const CAP_2035 = (2035-2026)*12; // = 108 months from Dec 2026
   const ms=document.getElementById('milestones'); ms.innerHTML='';
   [{label:'Schulden unter 150.000 €',target:150000},
    {label:'Schulden unter 100.000 €',target:100000},
@@ -792,9 +796,9 @@ function updateAllViews() {
    {label:'Schulden unter 50.000 €',target:50000},
    {label:'Vollständige Schuldenfreiheit',target:0}
   ].forEach(th=>{
-    let when='–';
+    let when='nach 2035';
     const arr=th.loan==='sv'?svArrSim:svArrSim.map((v,i)=>v+(akArrSim[i]||0));
-    const cap=th.loan==='sv'?SIM_MAXMONTH.sv:Math.max(SIM_MAXMONTH.sv,SIM_MAXMONTH.ak);
+    const cap=th.loan==='sv'?Math.min(SIM_MAXMONTH.sv,CAP_2035):CAP_2035;
     for(let m=0;m<=cap;m++){
       if((arr[m]||0)<=th.target){const d=new Date(2026,11+m,1);when=MONTH_NAMES[d.getMonth()]+' '+d.getFullYear();break;}
     }
@@ -803,25 +807,26 @@ function updateAllViews() {
     ms.appendChild(d);
   });
 
-  buildJahresTable(fcSimYears,fcSimRest,fcSimZins,fcSimTilg,simPlan);
+  buildJahresTable(fcSimYears.filter(y=>y<=2035), fcSimRest.filter((_,i)=>fcSimYears[i]<=2035), fcSimZins.filter((_,i)=>fcSimYears[i]<=2035), fcSimTilg.filter((_,i)=>fcSimYears[i]<=2035), simPlan);
 
-  // Charts
+  // ── Charts — all capped at 2035 ──
   const istY=IST.map(r=>r.y), istR=IST.map(r=>r.r), nIst=istY.length;
-  const fcYF=fcSimYears.filter(y=>y>2026);
+  const fcYF=fcSimYears.filter(y=>y>2026 && y<=2035);
   const allL=[...istY,...fcYF].map(String);
 
   const stopAt0=(arr)=>{let done=false;return arr.map(v=>{if(done)return null;if(v!==null&&v!==undefined&&v<=0){done=true;return 0;}return v;});};
 
-  const fcSimR_chart  = stopAt0([IST_END,...fcSimRest.filter((_,i)=>fcSimYears[i]>2026)]);
-  const fcBaseR_chart = stopAt0([IST_END,...fcBaseRest.filter((_,i)=>fcBaseYears[i]>2026)]);
-  const fcZ=fcSimZins.filter((_,i)=>fcSimYears[i]>2026);
-  const fcT=fcSimTilg.filter((_,i)=>fcSimYears[i]>2026);
+  // For overview chart 1: blaue Sim-Linie nur wenn hasSim, sonst nur Basis
+  const fcSimR_chart  = stopAt0([IST_END,...fcSimRest.filter((_,i)=>fcSimYears[i]>2026&&fcSimYears[i]<=2035)]);
+  const fcBaseR_chart = stopAt0([IST_END,...fcBaseRest.filter((_,i)=>fcBaseYears[i]>2026&&fcBaseYears[i]<=2035)]);
+  const fcZ=fcSimZins.filter((_,i)=>fcSimYears[i]>2026&&fcSimYears[i]<=2035);
+  const fcT=fcSimTilg.filter((_,i)=>fcSimYears[i]>2026&&fcSimYears[i]<=2035);
 
   if(chartOv1) chartOv1.destroy();
   chartOv1=new Chart(document.getElementById('c-overview1'),{type:'line',data:{labels:allL,datasets:[
     {label:'Ist',data:[...istR,...pad(allL.length-nIst)],borderColor:'#1D9E75',backgroundColor:'rgba(29,158,117,0.08)',fill:true,tension:0.3,pointRadius:3,borderWidth:2},
-    {label:'Mit Sim-ST',data:[...pad(nIst-1),...fcSimR_chart],borderColor:'#378ADD',backgroundColor:'rgba(55,138,221,0.05)',fill:true,borderDash:[6,4],tension:0.3,pointRadius:2,borderWidth:2,spanGaps:false},
     {label:'Ohne ST',data:[...pad(nIst-1),...fcBaseR_chart],borderColor:'#EF9F27',borderDash:[6,4],tension:0.3,pointRadius:2,borderWidth:2,spanGaps:false,backgroundColor:'transparent'},
+    ...(hasSim?[{label:'Mit Simulator-ST',data:[...pad(nIst-1),...fcSimR_chart],borderColor:'#378ADD',backgroundColor:'rgba(55,138,221,0.05)',fill:true,borderDash:[6,4],tension:0.3,pointRadius:2,borderWidth:2,spanGaps:false}]:[]),
   ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>Math.round(v/1000)+'k€'}},x:{ticks:{autoSkip:true,maxTicksLimit:10}}}}});
 
   if(chartOv2) chartOv2.destroy();
